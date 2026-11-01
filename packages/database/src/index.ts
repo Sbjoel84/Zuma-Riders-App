@@ -6,6 +6,8 @@ export * from "./generated/client/client";
 export interface CreatePrismaOptions {
   connectionString: string;
   log?: boolean;
+  /** Suppress Prisma's own error logging (errors are still thrown). */
+  quiet?: boolean;
 }
 
 /**
@@ -16,6 +18,6 @@ export function createPrismaClient(opts: CreatePrismaOptions): PrismaClient {
   const adapter = new PrismaPg({ connectionString: opts.connectionString });
   return new PrismaClient({
     adapter,
-    log: opts.log ? ["query", "warn", "error"] : ["warn", "error"],
+    log: opts.quiet ? [] : opts.log ? ["query", "warn", "error"] : ["warn", "error"],
   });
 }

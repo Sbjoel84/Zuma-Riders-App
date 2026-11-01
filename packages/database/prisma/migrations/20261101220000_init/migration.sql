@@ -2141,7 +2141,9 @@ ALTER TABLE "Refund"               ADD CONSTRAINT refund_amount_positive       C
 ALTER TABLE "Withdrawal"           ADD CONSTRAINT withdrawal_amount_positive   CHECK (amount > 0);
 ALTER TABLE "Commission"           ADD CONSTRAINT commission_valid             CHECK (amount >= 0 AND amount <= "grossFare" AND "commissionBps" BETWEEN 0 AND 10000);
 ALTER TABLE "PricingConfiguration" ADD CONSTRAINT pricing_bounds_valid         CHECK ("minFare" > 0 AND "maxFare" > "minFare" AND "commissionBps" BETWEEN 0 AND 10000);
-ALTER TABLE "Wallet"               ADD CONSTRAINT wallet_balance_floor         CHECK ("availableBalance" >= -"negativeLimit" AND "pendingBalance" >= 0 AND "heldBalance" >= 0);
+-- availableBalance may go below -negativeLimit when cash commission is booked (a trip must never fail to
+-- complete because of it); the limit is enforced in code by blocking go-online and withdrawals instead.
+ALTER TABLE "Wallet"               ADD CONSTRAINT wallet_buckets_non_negative  CHECK ("pendingBalance" >= 0 AND "heldBalance" >= 0);
 
 -- Only one active (effectiveTo IS NULL) pricing row per area+category.
 CREATE UNIQUE INDEX pricing_one_active ON "PricingConfiguration" ("serviceAreaId", "categoryId") WHERE "effectiveTo" IS NULL;
