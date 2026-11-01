@@ -1,0 +1,1947 @@
+// =============================================================================
+// Ride-hailing platform — PostgreSQL schema (Prisma)
+// Phase 1 deliverable. See docs/DECISIONS.md for the reasoning behind
+// money representation, the ledger, ride locking and entity merges.
+//
+// Conventions
+//  - IDs: cuid() strings. Public-facing references (ride codes, payment refs)
+//    are separate human-readable columns.
+//  - Money: BigInt in KOBO (minor units). Never Float/Decimal for balances.
+//  - Time: timestamptz everywhere (@db.Timestamptz(3)).
+//  - Geo: PostGIS geography(Point,4326) for anything queried spatially; plain
+//    lat/lng doubles kept alongside for app convenience.
+//  - Soft delete: deletedAt on user-owned, non-financial records only.
+//    Financial and completed-trip records are never deleted (onDelete: Restrict).
+// =============================================================================
+
+generator client {
+  provider        = "prisma-client"
+  output          = "../src/generated/client"
+  moduleFormat    = "cjs"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+// Connection URLs live in prisma.config.ts (Prisma 7). Runtime uses @prisma/adapter-pg.
+datasource db {
+  provider   = "postgresql"
+  extensions = [postgis, citext, pgcrypto]
+}
+
+// -----------------------------------------------------------------------------
+// ENUMS
+// -----------------------------------------------------------------------------
+
+enum UserStatus {
+  PENDING_VERIFICATION
+  ACTIVE
+  SUSPENDED
+  BLACKLISTED
+  DELETION_REQUESTED
+  CLOSED
+}
+
+enum RoleScope {
+  PASSENGER
+  DRIVER
+  ADMIN
+}
+
+enum OtpPurpose {
+  SIGNUP
+  LOGIN
+  PHONE_CHANGE
+  PASSWORD_RESET
+  TRIP_PIN
+  ADMIN_2FA_RECOVERY
+}
+
+enum DevicePlatform {
+  ANDROID
+  IOS
+  WEB
+}
+
+enum DriverVerificationStatus {
+  NOT_SUBMITTED
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+enum DocumentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+enum DriverDocumentType {
+  DRIVERS_LICENCE
+  NATIONAL_ID
+  PROFILE_PHOTO
+  PROOF_OF_ADDRESS
+  GUARANTOR_FORM
+  POLICE_CLEARANCE
+}
+
+enum VehicleDocumentType {
+  VEHICLE_REGISTRATION
+  ROADWORTHINESS
+  INSURANCE
+  INSPECTION_REPORT
+  PROOF_OF_OWNERSHIP
+  HACKNEY_PERMIT
+  PHOTO_FRONT
+  PHOTO_BACK
+  PHOTO_SIDE
+  PHOTO_INTERIOR
+}
+
+enum VehicleStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  SUSPENDED
+  RETIRED
+}
+
+enum AvailabilityStatus {
+  OFFLINE
+  ONLINE
+  ON_TRIP
+  PAUSED
+}
+
+enum RideStatus {
+  REQUESTED
+  SEARCHING
+  OFFERS_RECEIVED
+  DRIVER_SELECTED
+  DRIVER_EN_ROUTE
+  DRIVER_ARRIVED
+  TRIP_STARTED
+  TRIP_COMPLETED
+  CANCELLED
+  EXPIRED
+  DISPUTED
+}
+
+enum OfferStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+  EXPIRED
+  SUPERSEDED
+}
+
+enum NegotiationAction {
+  PASSENGER_PROPOSED
+  PASSENGER_RAISED_FARE
+  DRIVER_ACCEPTED_PRICE
+  DRIVER_COUNTER_OFFER
+  DRIVER_UPDATED_OFFER
+  DRIVER_WITHDREW
+  DRIVER_DECLINED
+  PASSENGER_REJECTED_OFFER
+  PASSENGER_ACCEPTED_OFFER
+  OFFER_EXPIRED
+  REQUEST_EXPIRED
+}
+
+enum ActorType {
+  PASSENGER
+  DRIVER
+  ADMIN
+  SYSTEM
+}
+
+enum WaypointType {
+  PICKUP
+  STOP
+  DROPOFF
+}
+
+enum PaymentMethodType {
+  CASH
+  WALLET
+  CARD
+  BANK_TRANSFER
+}
+
+enum PaymentProvider {
+  NONE
+  PAYSTACK
+  FLUTTERWAVE
+}
+
+enum PaymentPurpose {
+  RIDE_FARE
+  WALLET_TOPUP
+  CANCELLATION_FEE
+  COMMISSION_SETTLEMENT
+}
+
+enum PaymentStatus {
+  INITIATED
+  PENDING
+  SUCCEEDED
+  FAILED
+  ABANDONED
+  REVERSED
+  PARTIALLY_REFUNDED
+  REFUNDED
+}
+
+enum WebhookStatus {
+  RECEIVED
+  SIGNATURE_INVALID
+  PROCESSED
+  DUPLICATE
+  UNMATCHED
+  FAILED
+}
+
+enum RefundStatus {
+  REQUESTED
+  APPROVED
+  PROCESSING
+  COMPLETED
+  REJECTED
+  FAILED
+}
+
+enum WithdrawalStatus {
+  REQUESTED
+  APPROVED
+  PROCESSING
+  COMPLETED
+  REJECTED
+  FAILED
+  CANCELLED
+}
+
+enum WalletOwnerType {
+  PASSENGER
+  DRIVER
+}
+
+enum LedgerAccountType {
+  ASSET
+  LIABILITY
+  REVENUE
+  EXPENSE
+  EQUITY
+}
+
+// System accounts are singletons per currency; wallet accounts belong to a Wallet.
+enum LedgerAccountPurpose {
+  WALLET_AVAILABLE
+  WALLET_PENDING
+  WALLET_HELD
+  PLATFORM_COMMISSION_REVENUE
+  PLATFORM_CANCELLATION_REVENUE
+  PROMO_EXPENSE
+  REFERRAL_EXPENSE
+  PAYSTACK_CLEARING
+  FLUTTERWAVE_CLEARING
+  BANK_PAYOUT_CLEARING
+  PROVIDER_FEES_EXPENSE
+  SUSPENSE
+}
+
+enum EntryDirection {
+  DEBIT
+  CREDIT
+}
+
+enum LedgerTxnType {
+  WALLET_TOPUP
+  RIDE_PAYMENT_WALLET
+  RIDE_PAYMENT_CARD
+  RIDE_CASH_COMMISSION
+  DRIVER_EARNING
+  COMMISSION
+  PENDING_RELEASE
+  WITHDRAWAL_HOLD
+  WITHDRAWAL_PAYOUT
+  WITHDRAWAL_RELEASE
+  REFUND
+  REVERSAL
+  CANCELLATION_FEE
+  PROMO_CREDIT
+  REFERRAL_REWARD
+  ADJUSTMENT
+}
+
+enum WalletTxnStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REVERSED
+}
+
+enum CommissionStatus {
+  CALCULATED
+  COLLECTED
+  OUTSTANDING
+  WAIVED
+  REVERSED
+}
+
+enum SettlementStatus {
+  OPEN
+  RECONCILED
+  DISCREPANCY
+  CLOSED
+}
+
+enum ConversationType {
+  RIDE
+  SUPPORT
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  QUICK_REPLY
+  SYSTEM
+}
+
+enum NotificationChannel {
+  PUSH
+  SMS
+  EMAIL
+  IN_APP
+}
+
+enum NotificationStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  FAILED
+  READ
+}
+
+enum PromoDiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+}
+
+enum PromotionAudience {
+  PASSENGER
+  DRIVER
+  ALL
+}
+
+enum ReferralStatus {
+  PENDING
+  QUALIFIED
+  REWARDED
+  REJECTED_FRAUD
+  EXPIRED
+}
+
+enum TicketCategory {
+  PASSENGER_COMPLAINT
+  DRIVER_COMPLAINT
+  TRIP_ISSUE
+  LOST_PROPERTY
+  PAYMENT
+  ACCOUNT
+  SAFETY
+  OTHER
+}
+
+enum TicketPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum TicketStatus {
+  OPEN
+  ASSIGNED
+  AWAITING_USER
+  RESOLVED
+  CLOSED
+}
+
+enum DisputeStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED_PASSENGER_FAVOUR
+  RESOLVED_DRIVER_FAVOUR
+  RESOLVED_SPLIT
+  DISMISSED
+}
+
+enum SafetyIncidentType {
+  SOS
+  UNSAFE_DRIVER
+  UNSAFE_PASSENGER
+  ACCIDENT
+  HARASSMENT
+  ROUTE_DEVIATION
+  OTHER
+}
+
+enum SafetyIncidentStatus {
+  TRIGGERED
+  ACKNOWLEDGED
+  CONTACTS_NOTIFIED
+  ESCALATED_EXTERNAL
+  RESOLVED
+  FALSE_ALARM
+}
+
+enum ServiceAreaStatus {
+  ACTIVE
+  PAUSED
+  RESTRICTED
+}
+
+enum SettingValueType {
+  STRING
+  NUMBER
+  BOOLEAN
+  JSON
+}
+
+// -----------------------------------------------------------------------------
+// USERS, AUTH, RBAC
+// -----------------------------------------------------------------------------
+
+model User {
+  id                String     @id @default(cuid())
+  phoneE164         String     @unique // +234XXXXXXXXXX; international allowed
+  phoneVerifiedAt   DateTime?  @db.Timestamptz(3)
+  email             String?    @unique @db.Citext
+  emailVerifiedAt   DateTime?  @db.Timestamptz(3)
+  passwordHash      String? // argon2id; nullable for OTP-only accounts
+  firstName         String
+  lastName          String
+  avatarFileId      String?
+  locale            String     @default("en")
+  status            UserStatus @default(PENDING_VERIFICATION)
+  statusReason      String?
+  referralCode      String     @unique
+  termsAcceptedAt   DateTime?  @db.Timestamptz(3)
+  termsVersion      String?
+  privacyConsentAt  DateTime?  @db.Timestamptz(3)
+  marketingConsent  Boolean    @default(false)
+  lastLoginAt       DateTime?  @db.Timestamptz(3)
+  deletionRequestedAt DateTime? @db.Timestamptz(3)
+  createdAt         DateTime   @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime   @updatedAt @db.Timestamptz(3)
+  deletedAt         DateTime?  @db.Timestamptz(3) // PII scrubbed, row kept for FK integrity
+
+  avatarFile        FileObject?        @relation("UserAvatar", fields: [avatarFileId], references: [id], onDelete: SetNull)
+  passengerProfile  PassengerProfile?
+  driver            Driver?
+  adminProfile      AdminProfile?
+  roles             UserRole[]         @relation("UserRoles")
+  rolesGranted      UserRole[]         @relation("RoleGrantedBy")
+  sessions          UserSession[]
+  otps              OtpVerification[]
+  devices           Device[]
+  emergencyContacts EmergencyContact[]
+  savedPlaces       SavedPlace[]
+  wallets           Wallet[]
+  paymentMethods    PaymentMethod[]
+  payments          Payment[]
+  conversationsIn   ConversationParticipant[]
+  messagesSent      Message[]
+  notifications     Notification[]
+  notificationPrefs NotificationPreference[]
+  pushTokens        PushToken[]
+  ratingsGiven      RideRating[]       @relation("RatingRater")
+  ratingsReceived   RideRating[]       @relation("RatingRatee")
+  supportTickets    SupportTicket[]    @relation("TicketRequester")
+  ticketMessages    SupportMessage[]
+  safetyIncidents   SafetyIncident[]   @relation("IncidentReporter")
+  referralsMade     Referral[]         @relation("Referrer")
+  referredBy        Referral?          @relation("Referee")
+  promoRedemptions  PromoRedemption[]
+  uploadedFiles     FileObject[]       @relation("FileUploader")
+  cancellations     RideCancellation[]
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model PassengerProfile {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  ratingAvg     Decimal  @default(5.00) @db.Decimal(3, 2)
+  ratingCount   Int      @default(0)
+  tripsCompleted Int     @default(0)
+  cancellationCount Int  @default(0)
+  defaultPaymentMethod PaymentMethodType @default(CASH)
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime @updatedAt @db.Timestamptz(3)
+
+  user          User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  rideRequests  RideRequest[]
+  rides         Ride[]
+}
+
+model AdminProfile {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  jobTitle         String?
+  totpSecretEnc    String? // AES-GCM encrypted with KMS-managed key
+  totpEnabledAt    DateTime? @db.Timestamptz(3)
+  recoveryCodesHash String[]
+  ipAllowlist      String[]
+  createdAt        DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime @updatedAt @db.Timestamptz(3)
+
+  user             User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  auditLogs        AuditLog[]
+  actionLogs       AdminActionLog[]
+  documentReviews  DriverDocument[]   @relation("DocReviewer")
+  vehicleDocReviews VehicleDocument[] @relation("VehicleDocReviewer")
+  verifications    DriverVerification[]
+  assignedTickets  SupportTicket[]  @relation("TicketAssignee")
+  disputesHandled  Dispute[]
+  incidentsHandled SafetyIncident[] @relation("IncidentHandler")
+  withdrawalsApproved Withdrawal[]
+  refundsApproved  Refund[]
+  pricingChanges   PricingConfiguration[]
+}
+
+model Role {
+  id          String    @id @default(cuid())
+  key         String    @unique // e.g. passenger, driver, super_admin, ops_agent, finance, support
+  name        String
+  scope       RoleScope
+  description String?
+  isSystem    Boolean   @default(false)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
+
+  permissions RolePermission[]
+  users       UserRole[]
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  key         String   @unique // resource:action, e.g. drivers:approve, pricing:write
+  description String?
+  roles       RolePermission[]
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model UserRole {
+  userId      String
+  roleId      String
+  cityId      String? // null = global; otherwise role scoped to a city (e.g. Abuja ops)
+  grantedById String?
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  user        User  @relation("UserRoles", fields: [userId], references: [id], onDelete: Cascade)
+  role        Role  @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  city        City? @relation(fields: [cityId], references: [id], onDelete: Restrict)
+  grantedBy   User? @relation("RoleGrantedBy", fields: [grantedById], references: [id], onDelete: SetNull)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+}
+
+// Refresh-token family. Each rotation inserts a new row and revokes the parent;
+// reuse of a revoked token revokes the whole family.
+model UserSession {
+  id               String    @id @default(cuid())
+  userId           String
+  deviceId         String?
+  familyId         String
+  refreshTokenHash String    @unique
+  parentSessionId  String?
+  scope            RoleScope
+  ipAddress        String?
+  userAgent        String?
+  expiresAt        DateTime  @db.Timestamptz(3)
+  revokedAt        DateTime? @db.Timestamptz(3)
+  revokedReason    String?
+  lastUsedAt       DateTime? @db.Timestamptz(3)
+  createdAt        DateTime  @default(now()) @db.Timestamptz(3)
+
+  user             User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device           Device? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+
+  @@index([userId, revokedAt])
+  @@index([familyId])
+}
+
+model OtpVerification {
+  id          String     @id @default(cuid())
+  userId      String?
+  phoneE164   String
+  purpose     OtpPurpose
+  codeHash    String
+  attempts    Int        @default(0)
+  maxAttempts Int        @default(5)
+  provider    String? // termii, twilio...
+  providerRef String?
+  expiresAt   DateTime   @db.Timestamptz(3)
+  consumedAt  DateTime?  @db.Timestamptz(3)
+  ipAddress   String?
+  createdAt   DateTime   @default(now()) @db.Timestamptz(3)
+
+  user        User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([phoneE164, purpose, createdAt])
+}
+
+model Device {
+  id           String         @id @default(cuid())
+  userId       String
+  installId    String // generated by the app on first launch
+  platform     DevicePlatform
+  model        String?
+  osVersion    String?
+  appVersion   String?
+  lastSeenAt   DateTime?      @db.Timestamptz(3)
+  createdAt    DateTime       @default(now()) @db.Timestamptz(3)
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessions     UserSession[]
+  pushTokens   PushToken[]
+
+  @@unique([userId, installId])
+}
+
+model EmergencyContact {
+  id           String   @id @default(cuid())
+  userId       String
+  name         String
+  phoneE164    String
+  relationship String?
+  shareTripsAutomatically Boolean @default(false)
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+  deletedAt    DateTime? @db.Timestamptz(3)
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model SavedPlace {
+  id        String   @id @default(cuid())
+  userId    String
+  label     String // "Home", "Work", custom
+  kind      String   @default("CUSTOM") // HOME | WORK | CUSTOM
+  address   String
+  placeId   String? // maps provider place id
+  lat       Float
+  lng       Float
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  deletedAt DateTime? @db.Timestamptz(3)
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// -----------------------------------------------------------------------------
+// FILES (object storage metadata — documents are never served from a public URL)
+// -----------------------------------------------------------------------------
+
+model FileObject {
+  id           String   @id @default(cuid())
+  uploaderId   String?
+  bucket       String
+  objectKey    String   @unique
+  mimeType     String
+  sizeBytes    Int
+  sha256       String
+  isPrivate    Boolean  @default(true)
+  scanStatus   String   @default("PENDING") // PENDING | CLEAN | INFECTED
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+
+  uploader         User?               @relation("FileUploader", fields: [uploaderId], references: [id], onDelete: SetNull)
+  avatarsFor       User[]              @relation("UserAvatar")
+  driverDocuments  DriverDocument[]
+  vehicleDocuments VehicleDocument[]
+  messages         Message[]
+  evidence         EvidenceAttachment[]
+  receipts         Receipt[]
+  invoices         Invoice[]
+}
+
+// -----------------------------------------------------------------------------
+// DRIVERS & VEHICLES
+// -----------------------------------------------------------------------------
+
+// Merges the spec's "DriverProfile" and "Driver" into one entity (see DECISIONS.md).
+model Driver {
+  id                 String                   @id @default(cuid())
+  userId             String                   @unique
+  cityId             String
+  verificationStatus DriverVerificationStatus @default(NOT_SUBMITTED)
+  activeVehicleId    String?                  @unique
+  licenceNumber      String?
+  licenceExpiresAt   DateTime?                @db.Timestamptz(3)
+  dateOfBirth        DateTime?                @db.Date
+  addressLine        String?
+  bankName           String?
+  bankCode           String?
+  bankAccountName    String?
+  bankAccountLast4   String?
+  payoutRecipientCode String? // Paystack/Flutterwave transfer recipient, not raw account number
+  ratingAvg          Decimal                  @default(5.00) @db.Decimal(3, 2)
+  ratingCount        Int                      @default(0)
+  tripsCompleted     Int                      @default(0)
+  acceptanceRate     Decimal                  @default(1.0) @db.Decimal(4, 3)
+  cancellationRate   Decimal                  @default(0.0) @db.Decimal(4, 3)
+  isBlacklisted      Boolean                  @default(false)
+  suspendedUntil     DateTime?                @db.Timestamptz(3)
+  approvedAt         DateTime?                @db.Timestamptz(3)
+  createdAt          DateTime                 @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime                 @updatedAt @db.Timestamptz(3)
+
+  user               User                 @relation(fields: [userId], references: [id], onDelete: Restrict)
+  city               City                 @relation(fields: [cityId], references: [id], onDelete: Restrict)
+  activeVehicle      Vehicle?             @relation("ActiveVehicle", fields: [activeVehicleId], references: [id], onDelete: SetNull)
+  vehicles           Vehicle[]            @relation("DriverVehicles")
+  documents          DriverDocument[]
+  verifications      DriverVerification[]
+  availability       DriverAvailability?
+  locations          DriverLocation[]
+  offers             RideOffer[]
+  rides              Ride[]
+  commissions        Commission[]
+
+  @@index([cityId, verificationStatus])
+}
+
+model DriverDocument {
+  id           String             @id @default(cuid())
+  driverId     String
+  type         DriverDocumentType
+  fileId       String
+  documentNumber String?
+  issuedAt     DateTime?          @db.Date
+  expiresAt    DateTime?          @db.Date
+  status       DocumentStatus     @default(PENDING)
+  rejectionReason String?
+  reviewedById String?
+  reviewedAt   DateTime?          @db.Timestamptz(3)
+  supersededAt DateTime?          @db.Timestamptz(3) // set when a newer upload of the same type replaces it
+  createdAt    DateTime           @default(now()) @db.Timestamptz(3)
+
+  driver       Driver        @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  file         FileObject    @relation(fields: [fileId], references: [id], onDelete: Restrict)
+  reviewedBy   AdminProfile? @relation("DocReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([driverId, type])
+  @@index([status, expiresAt])
+}
+
+model VehicleCategory {
+  id          String   @id @default(cuid())
+  key         String   @unique // economy, comfort, premium, suv, motorcycle, tricycle
+  name        String
+  description String?
+  seats       Int
+  iconFileKey String?
+  sortOrder   Int      @default(0)
+  minYear     Int? // minimum manufacture year allowed
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  vehicles     Vehicle[]
+  rideRequests RideRequest[]
+  pricing      PricingConfiguration[]
+  cityCategories CityVehicleCategory[]
+}
+
+model Vehicle {
+  id             String        @id @default(cuid())
+  driverId       String
+  categoryId     String
+  make           String
+  model          String
+  year           Int
+  colour         String
+  plateNumber    String        @unique
+  vin            String?       @unique
+  status         VehicleStatus @default(PENDING_REVIEW)
+  rejectionReason String?
+  approvedAt     DateTime?     @db.Timestamptz(3)
+  createdAt      DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime      @updatedAt @db.Timestamptz(3)
+  deletedAt      DateTime?     @db.Timestamptz(3)
+
+  driver         Driver            @relation("DriverVehicles", fields: [driverId], references: [id], onDelete: Restrict)
+  activeFor      Driver?           @relation("ActiveVehicle")
+  category       VehicleCategory   @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  documents      VehicleDocument[]
+  rides          Ride[]
+  offers         RideOffer[]
+
+  @@index([driverId])
+  @@index([categoryId, status])
+}
+
+model VehicleDocument {
+  id           String              @id @default(cuid())
+  vehicleId    String
+  type         VehicleDocumentType
+  fileId       String
+  documentNumber String?
+  expiresAt    DateTime?           @db.Date
+  status       DocumentStatus      @default(PENDING)
+  rejectionReason String?
+  reviewedById String?
+  reviewedAt   DateTime?           @db.Timestamptz(3)
+  supersededAt DateTime?           @db.Timestamptz(3)
+  createdAt    DateTime            @default(now()) @db.Timestamptz(3)
+
+  vehicle      Vehicle       @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  file         FileObject    @relation(fields: [fileId], references: [id], onDelete: Restrict)
+  reviewedBy   AdminProfile? @relation("VehicleDocReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([vehicleId, type])
+  @@index([status, expiresAt])
+}
+
+// One row per review decision — the verification history.
+model DriverVerification {
+  id           String                   @id @default(cuid())
+  driverId     String
+  fromStatus   DriverVerificationStatus
+  toStatus     DriverVerificationStatus
+  reviewerId   String?
+  notes        String?
+  checklist    Json? // { licence: true, insurance: false, ... }
+  createdAt    DateTime                 @default(now()) @db.Timestamptz(3)
+
+  driver       Driver        @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  reviewer     AdminProfile? @relation(fields: [reviewerId], references: [id], onDelete: SetNull)
+
+  @@index([driverId, createdAt])
+}
+
+// Durable mirror of availability. Hot state (heartbeat, geo index) lives in Redis.
+model DriverAvailability {
+  driverId        String             @id
+  status          AvailabilityStatus @default(OFFLINE)
+  serviceAreaId   String?
+  lastHeartbeatAt DateTime?          @db.Timestamptz(3)
+  lastLat         Float?
+  lastLng         Float?
+  wentOnlineAt    DateTime?          @db.Timestamptz(3)
+  updatedAt       DateTime           @updatedAt @db.Timestamptz(3)
+
+  driver          Driver       @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  serviceArea     ServiceArea? @relation(fields: [serviceAreaId], references: [id], onDelete: SetNull)
+
+  @@index([status, serviceAreaId])
+}
+
+// Sampled history (e.g. every 30s while online, off-trip). On-trip breadcrumbs go to RideLocation.
+// Partition by month in production; retention per DATA_RETENTION policy.
+model DriverLocation {
+  id         BigInt   @id @default(autoincrement())
+  driverId   String
+  lat        Float
+  lng        Float
+  geog       Unsupported("geography(Point,4326)")?
+  heading    Float?
+  speedKmh   Float?
+  accuracyM  Float?
+  recordedAt DateTime @db.Timestamptz(3)
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+
+  driver     Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId, recordedAt])
+}
+
+// -----------------------------------------------------------------------------
+// GEOGRAPHY & PRICING
+// -----------------------------------------------------------------------------
+
+model City {
+  id          String   @id @default(cuid())
+  key         String   @unique // abuja, lagos, kaduna, kano, port-harcourt
+  name        String
+  state       String
+  countryCode String   @default("NG")
+  currency    String   @default("NGN")
+  timezone    String   @default("Africa/Lagos")
+  centerLat   Float
+  centerLng   Float
+  isLive      Boolean  @default(false)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  serviceAreas   ServiceArea[]
+  drivers        Driver[]
+  rideRequests   RideRequest[]
+  vehicleCategories CityVehicleCategory[]
+  userRoles      UserRole[]
+  promotions     Promotion[]
+  supportContacts Json? // { phone, whatsapp, email, emergencyNumbers: [...] }
+}
+
+model CityVehicleCategory {
+  cityId     String
+  categoryId String
+  isEnabled  Boolean @default(true)
+  legalNote  String? // e.g. motorcycles restricted in city centre
+
+  city       City            @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  category   VehicleCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@id([cityId, categoryId])
+}
+
+model ServiceArea {
+  id            String            @id @default(cuid())
+  cityId        String
+  name          String // e.g. "Abuja Central", "Kubwa", "Lugbe"
+  boundary      Unsupported("geography(MultiPolygon,4326)")
+  status        ServiceAreaStatus @default(ACTIVE)
+  operatingHours Json? // [{ day: 0-6, open: "05:00", close: "23:30" }]
+  restrictedCategoryKeys String[] // categories disallowed here
+  searchRadiusM Int               @default(3000)
+  maxSearchRadiusM Int            @default(8000)
+  radiusStepM   Int               @default(1500)
+  createdAt     DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime          @updatedAt @db.Timestamptz(3)
+
+  city          City                   @relation(fields: [cityId], references: [id], onDelete: Restrict)
+  pricing       PricingConfiguration[]
+  availability  DriverAvailability[]
+  rideRequests  RideRequest[]
+
+  @@index([cityId])
+}
+
+// Versioned, immutable once superseded. A new row is inserted on every change;
+// the active one has effectiveTo = null. Rides snapshot the id they priced against.
+model PricingConfiguration {
+  id                    String    @id @default(cuid())
+  serviceAreaId         String
+  categoryId            String
+  version               Int
+  baseFare              BigInt // kobo
+  perKm                 BigInt
+  perMinute             BigInt
+  minFare               BigInt // floor for any proposal
+  maxFare               BigInt // ceiling for any proposal / offer
+  minFarePerKm          BigInt // proposal must be >= distanceKm * this
+  bookingFee            BigInt    @default(0)
+  waitingFreeMinutes    Int       @default(3)
+  waitingPerMinute      BigInt    @default(0)
+  cancellationFeePassenger BigInt @default(0)
+  cancellationFeeDriver BigInt    @default(0)
+  cancellationGraceSeconds Int    @default(120)
+  commissionBps         Int // 1500 = 15.00%
+  requestTtlSeconds     Int       @default(180)
+  offerTtlSeconds       Int       @default(45)
+  maxCounterOfferPctAbove Int     @default(100) // driver counter cannot exceed proposal by >100%
+  effectiveFrom         DateTime  @default(now()) @db.Timestamptz(3)
+  effectiveTo           DateTime? @db.Timestamptz(3)
+  createdById           String?
+  changeReason          String?
+  createdAt             DateTime  @default(now()) @db.Timestamptz(3)
+
+  serviceArea           ServiceArea     @relation(fields: [serviceAreaId], references: [id], onDelete: Restrict)
+  category              VehicleCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  createdBy             AdminProfile?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  rideRequests          RideRequest[]
+
+  @@unique([serviceAreaId, categoryId, version])
+  @@index([serviceAreaId, categoryId, effectiveTo])
+}
+
+model PlatformSetting {
+  key         String           @id // e.g. sos.dispatch_mode, ws.location_throttle_ms
+  value       String
+  valueType   SettingValueType
+  cityId      String? // null = global default
+  description String?
+  updatedById String?
+  updatedAt   DateTime         @updatedAt @db.Timestamptz(3)
+}
+
+// -----------------------------------------------------------------------------
+// RIDES & NEGOTIATION
+// -----------------------------------------------------------------------------
+
+// The negotiation phase. One per passenger booking attempt.
+model RideRequest {
+  id                 String     @id @default(cuid())
+  code               String     @unique // short human ref, e.g. R-7K2QX9
+  passengerId        String
+  cityId             String
+  serviceAreaId      String
+  categoryId         String
+  pricingConfigId    String // snapshot of the rules this request was validated against
+  status             RideStatus @default(REQUESTED)
+  pickupAddress      String
+  pickupLat          Float
+  pickupLng          Float
+  pickupGeog         Unsupported("geography(Point,4326)")?
+  dropoffAddress     String
+  dropoffLat         Float
+  dropoffLng         Float
+  routeDistanceM     Int // road-network distance from routing provider
+  routeDurationS     Int
+  routePolyline      String?
+  suggestedFare      BigInt // system recommendation shown to passenger
+  proposedFare       BigInt // passenger's current proposal (can be raised)
+  paymentMethod      PaymentMethodType
+  promoCodeId        String?
+  passengerNote      String?
+  idempotencyKey     String     @unique // client-generated; blocks duplicate submits on flaky networks
+  currentRadiusM     Int
+  broadcastCount     Int        @default(0)
+  expiresAt          DateTime   @db.Timestamptz(3)
+  cancelledAt        DateTime?  @db.Timestamptz(3)
+  createdAt          DateTime   @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime   @updatedAt @db.Timestamptz(3)
+
+  passenger          PassengerProfile     @relation(fields: [passengerId], references: [id], onDelete: Restrict)
+  city               City                 @relation(fields: [cityId], references: [id], onDelete: Restrict)
+  serviceArea        ServiceArea          @relation(fields: [serviceAreaId], references: [id], onDelete: Restrict)
+  category           VehicleCategory      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  pricingConfig      PricingConfiguration @relation(fields: [pricingConfigId], references: [id], onDelete: Restrict)
+  promoCode          PromoCode?           @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
+  waypoints          RideWaypoint[]
+  offers             RideOffer[]
+  negotiationEvents  FareNegotiation[]
+  ride               Ride? // at most one — this is the "confirmed RideAssignment"
+  dispatches         RideDispatch[]
+
+  @@index([passengerId, createdAt])
+  @@index([status, expiresAt])
+  @@index([serviceAreaId, status])
+}
+
+// Which drivers a request was sent to, and when (matching audit + no re-spam).
+model RideDispatch {
+  rideRequestId String
+  driverId      String
+  radiusM       Int
+  distanceToPickupM Int?
+  rankScore     Float?
+  sentAt        DateTime @default(now()) @db.Timestamptz(3)
+  seenAt        DateTime? @db.Timestamptz(3)
+  declinedAt    DateTime? @db.Timestamptz(3)
+
+  rideRequest   RideRequest @relation(fields: [rideRequestId], references: [id], onDelete: Cascade)
+
+  @@id([rideRequestId, driverId])
+  @@index([driverId, sentAt])
+}
+
+// A driver's current standing offer on a request. One live offer per driver per request;
+// updates bump `revision` and log a FareNegotiation event.
+model RideOffer {
+  id             String      @id @default(cuid())
+  rideRequestId  String
+  driverId       String
+  vehicleId      String
+  amount         BigInt // kobo
+  isPassengerPrice Boolean   @default(false) // true when driver accepted the proposal as-is
+  etaToPickupS   Int?
+  distanceToPickupM Int?
+  status         OfferStatus @default(PENDING)
+  revision       Int         @default(1)
+  expiresAt      DateTime    @db.Timestamptz(3)
+  respondedAt    DateTime?   @db.Timestamptz(3)
+  createdAt      DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime    @updatedAt @db.Timestamptz(3)
+
+  rideRequest    RideRequest       @relation(fields: [rideRequestId], references: [id], onDelete: Restrict)
+  driver         Driver            @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  vehicle        Vehicle           @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  acceptedFor    Ride?
+  events         FareNegotiation[]
+
+  @@unique([rideRequestId, driverId])
+  @@index([rideRequestId, status])
+  @@index([driverId, status])
+}
+
+// Append-only negotiation history. Never updated or deleted.
+model FareNegotiation {
+  id            String            @id @default(cuid())
+  rideRequestId String
+  offerId       String?
+  actorType     ActorType
+  actorUserId   String?
+  action        NegotiationAction
+  amount        BigInt?
+  previousAmount BigInt?
+  metadata      Json?
+  createdAt     DateTime          @default(now()) @db.Timestamptz(3)
+
+  rideRequest   RideRequest @relation(fields: [rideRequestId], references: [id], onDelete: Restrict)
+  offer         RideOffer?  @relation(fields: [offerId], references: [id], onDelete: Restrict)
+
+  @@index([rideRequestId, createdAt])
+}
+
+// The confirmed trip. Creation IS the assignment: the unique constraints on
+// rideRequestId and acceptedOfferId make double-assignment impossible at the DB level.
+model Ride {
+  id               String     @id @default(cuid())
+  code             String     @unique
+  rideRequestId    String     @unique
+  acceptedOfferId  String     @unique
+  passengerId      String
+  driverId         String
+  vehicleId        String
+  status           RideStatus @default(DRIVER_SELECTED)
+  agreedFare       BigInt // locked at acceptance; immutable (enforced in service + DB trigger)
+  discountAmount   BigInt     @default(0)
+  waitingCharge    BigInt     @default(0)
+  finalFare        BigInt? // agreedFare - discount + waiting, set at completion
+  commissionBps    Int // snapshot from pricing config
+  paymentMethod    PaymentMethodType
+  tripPinHash      String // 4-digit PIN shown to passenger, entered by driver
+  pinAttempts      Int        @default(0)
+  assignedAt       DateTime   @default(now()) @db.Timestamptz(3)
+  arrivedAt        DateTime?  @db.Timestamptz(3)
+  startedAt        DateTime?  @db.Timestamptz(3)
+  completedAt      DateTime?  @db.Timestamptz(3)
+  cancelledAt      DateTime?  @db.Timestamptz(3)
+  actualDistanceM  Int?
+  actualDurationS  Int?
+  shareToken       String?    @unique // public live-trip link token (expires on completion)
+  version          Int        @default(0) // optimistic lock for state transitions
+  createdAt        DateTime   @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime   @updatedAt @db.Timestamptz(3)
+
+  rideRequest      RideRequest         @relation(fields: [rideRequestId], references: [id], onDelete: Restrict)
+  acceptedOffer    RideOffer           @relation(fields: [acceptedOfferId], references: [id], onDelete: Restrict)
+  passenger        PassengerProfile    @relation(fields: [passengerId], references: [id], onDelete: Restrict)
+  driver           Driver              @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  vehicle          Vehicle             @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  statusHistory    RideStatusHistory[]
+  locations        RideLocation[]
+  cancellation     RideCancellation?
+  ratings          RideRating[]
+  payments         Payment[]
+  commission       Commission?
+  receipt          Receipt?
+  invoice          Invoice?
+  conversation     Conversation?
+  tickets          SupportTicket[]
+  disputes         Dispute[]
+  safetyIncidents  SafetyIncident[]
+  promoRedemption  PromoRedemption?
+
+  @@index([passengerId, createdAt])
+  @@index([driverId, createdAt])
+  @@index([status])
+}
+
+model RideWaypoint {
+  id            String       @id @default(cuid())
+  rideRequestId String
+  sequence      Int
+  type          WaypointType
+  address       String
+  lat           Float
+  lng           Float
+  arrivedAt     DateTime?    @db.Timestamptz(3)
+
+  rideRequest   RideRequest @relation(fields: [rideRequestId], references: [id], onDelete: Cascade)
+
+  @@unique([rideRequestId, sequence])
+}
+
+model RideStatusHistory {
+  id          String      @id @default(cuid())
+  rideId      String
+  fromStatus  RideStatus?
+  toStatus    RideStatus
+  actorType   ActorType
+  actorUserId String?
+  lat         Float?
+  lng         Float?
+  reason      String?
+  createdAt   DateTime    @default(now()) @db.Timestamptz(3)
+
+  ride        Ride @relation(fields: [rideId], references: [id], onDelete: Restrict)
+
+  @@index([rideId, createdAt])
+}
+
+// On-trip GPS breadcrumbs (throttled, e.g. every 5s / 25m). Partition by month.
+model RideLocation {
+  id         BigInt   @id @default(autoincrement())
+  rideId     String
+  lat        Float
+  lng        Float
+  heading    Float?
+  speedKmh   Float?
+  accuracyM  Float?
+  recordedAt DateTime @db.Timestamptz(3)
+  clientSeq  Int // client-side sequence; dedupes replayed offline batches
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+
+  ride       Ride @relation(fields: [rideId], references: [id], onDelete: Restrict)
+
+  @@unique([rideId, clientSeq])
+  @@index([rideId, recordedAt])
+}
+
+model RideCancellation {
+  id              String    @id @default(cuid())
+  rideId          String    @unique
+  cancelledById   String?
+  actorType       ActorType
+  reasonCode      String // DRIVER_TOO_FAR, PASSENGER_NO_SHOW, CHANGED_PLANS ...
+  reasonText      String?
+  feeAmount       BigInt    @default(0)
+  feeChargedTo    ActorType?
+  feeWaived       Boolean   @default(false)
+  createdAt       DateTime  @default(now()) @db.Timestamptz(3)
+
+  ride            Ride  @relation(fields: [rideId], references: [id], onDelete: Restrict)
+  cancelledBy     User? @relation(fields: [cancelledById], references: [id], onDelete: SetNull)
+}
+
+model RideRating {
+  id          String    @id @default(cuid())
+  rideId      String
+  raterId     String
+  rateeId     String
+  raterRole   RoleScope // PASSENGER rates driver, DRIVER rates passenger
+  stars       Int // 1..5 — CHECK constraint in migration
+  comment     String?
+  tags        String[] // "clean car", "safe driving"
+  isAnonymous Boolean   @default(false)
+  isHidden    Boolean   @default(false) // moderated
+  reportedAt  DateTime? @db.Timestamptz(3)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+
+  ride        Ride @relation(fields: [rideId], references: [id], onDelete: Restrict)
+  rater       User @relation("RatingRater", fields: [raterId], references: [id], onDelete: Restrict)
+  ratee       User @relation("RatingRatee", fields: [rateeId], references: [id], onDelete: Restrict)
+
+  @@unique([rideId, raterRole])
+  @@index([rateeId, createdAt])
+}
+
+// -----------------------------------------------------------------------------
+// MONEY: WALLETS, DOUBLE-ENTRY LEDGER, PAYMENTS
+// -----------------------------------------------------------------------------
+
+// One wallet per user per owner type (a user who is both passenger and driver
+// gets two). Balances are cached projections of ledger entries, updated only
+// inside the same DB transaction that writes the entries.
+model Wallet {
+  id               String          @id @default(cuid())
+  userId           String
+  ownerType        WalletOwnerType
+  currency         String          @default("NGN")
+  availableBalance BigInt          @default(0) // cache of WALLET_AVAILABLE account
+  pendingBalance   BigInt          @default(0) // cache of WALLET_PENDING account
+  heldBalance      BigInt          @default(0) // cache of WALLET_HELD (withdrawals in flight)
+  negativeLimit    BigInt          @default(0) // drivers may owe cash commission up to this
+  isFrozen         Boolean         @default(false)
+  version          Int             @default(0)
+  createdAt        DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime        @updatedAt @db.Timestamptz(3)
+
+  user             User                @relation(fields: [userId], references: [id], onDelete: Restrict)
+  accounts         LedgerAccount[]
+  transactions     WalletTransaction[]
+  withdrawals      Withdrawal[]
+
+  @@unique([userId, ownerType])
+}
+
+model LedgerAccount {
+  id        String               @id @default(cuid())
+  code      String               @unique // e.g. SYS:PLATFORM_COMMISSION_REVENUE:NGN, WAL:<walletId>:AVAILABLE
+  type      LedgerAccountType
+  purpose   LedgerAccountPurpose
+  walletId  String?
+  currency  String               @default("NGN")
+  createdAt DateTime             @default(now()) @db.Timestamptz(3)
+
+  wallet    Wallet?       @relation(fields: [walletId], references: [id], onDelete: Restrict)
+  entries   LedgerEntry[]
+
+  @@unique([walletId, purpose])
+}
+
+// Journal header. Sum(debits) == Sum(credits) enforced by service + deferred
+// constraint trigger. Immutable: corrections are new REVERSAL/ADJUSTMENT txns.
+model LedgerTransaction {
+  id             String        @id @default(cuid())
+  type           LedgerTxnType
+  idempotencyKey String        @unique
+  description    String
+  rideId         String?
+  paymentId      String?
+  refundId       String?
+  withdrawalId   String?
+  reversesId     String?       @unique
+  createdByType  ActorType
+  createdById    String?
+  postedAt       DateTime      @default(now()) @db.Timestamptz(3)
+
+  entries          LedgerEntry[]
+  walletTxns       WalletTransaction[]
+  reverses         LedgerTransaction?  @relation("Reversal", fields: [reversesId], references: [id], onDelete: Restrict)
+  reversedBy       LedgerTransaction?  @relation("Reversal")
+  commission       Commission?
+
+  @@index([rideId])
+  @@index([paymentId])
+  @@index([postedAt])
+}
+
+model LedgerEntry {
+  id            String         @id @default(cuid())
+  transactionId String
+  accountId     String
+  direction     EntryDirection
+  amount        BigInt // always positive; CHECK (amount > 0)
+  currency      String         @default("NGN")
+  createdAt     DateTime       @default(now()) @db.Timestamptz(3)
+
+  transaction   LedgerTransaction @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+  account       LedgerAccount     @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@index([accountId, createdAt])
+  @@index([transactionId])
+}
+
+// User-facing statement line. Always backed by a LedgerTransaction.
+model WalletTransaction {
+  id                  String          @id @default(cuid())
+  walletId            String
+  ledgerTransactionId String
+  type                LedgerTxnType
+  direction           EntryDirection // CREDIT = money in for the user
+  amount              BigInt
+  balanceAfter        BigInt // available balance after posting
+  status              WalletTxnStatus @default(COMPLETED)
+  description         String
+  rideId              String?
+  createdAt           DateTime        @default(now()) @db.Timestamptz(3)
+
+  wallet              Wallet            @relation(fields: [walletId], references: [id], onDelete: Restrict)
+  ledgerTransaction   LedgerTransaction @relation(fields: [ledgerTransactionId], references: [id], onDelete: Restrict)
+
+  @@index([walletId, createdAt])
+}
+
+model PaymentMethod {
+  id              String            @id @default(cuid())
+  userId          String
+  type            PaymentMethodType
+  provider        PaymentProvider
+  authorizationCodeEnc String? // provider reusable auth token, encrypted
+  cardBrand       String?
+  cardLast4       String?
+  cardExpMonth    Int?
+  cardExpYear     Int?
+  bankName        String?
+  isDefault       Boolean           @default(false)
+  isReusable      Boolean           @default(false)
+  createdAt       DateTime          @default(now()) @db.Timestamptz(3)
+  deletedAt       DateTime?         @db.Timestamptz(3)
+
+  user            User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  payments        Payment[]
+
+  @@index([userId])
+}
+
+model Payment {
+  id              String          @id @default(cuid())
+  reference       String          @unique // our ref, sent to provider
+  idempotencyKey  String          @unique
+  userId          String
+  rideId          String?
+  paymentMethodId String?
+  purpose         PaymentPurpose
+  method          PaymentMethodType
+  provider        PaymentProvider @default(NONE)
+  providerRef     String? // provider transaction id
+  amount          BigInt
+  feeAmount       BigInt          @default(0) // provider fees
+  refundedAmount  BigInt          @default(0)
+  currency        String          @default("NGN")
+  status          PaymentStatus   @default(INITIATED)
+  failureReason   String?
+  verifiedAt      DateTime?       @db.Timestamptz(3) // set only after server-side verify call
+  rawVerifyResponse Json?
+  createdAt       DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime        @updatedAt @db.Timestamptz(3)
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  ride            Ride?            @relation(fields: [rideId], references: [id], onDelete: Restrict)
+  paymentMethod   PaymentMethod?   @relation(fields: [paymentMethodId], references: [id], onDelete: SetNull)
+  webhooks        PaymentWebhook[]
+  refunds         Refund[]
+  settlementItems SettlementItem[]
+
+  @@unique([provider, providerRef])
+  @@index([userId, createdAt])
+  @@index([rideId])
+  @@index([status, createdAt])
+}
+
+// Every inbound webhook is stored raw before processing. Dedup on provider event id.
+model PaymentWebhook {
+  id              String          @id @default(cuid())
+  provider        PaymentProvider
+  eventId         String // provider event id or hash of payload when absent
+  eventType       String
+  signatureValid  Boolean
+  payload         Json
+  paymentId       String?
+  status          WebhookStatus   @default(RECEIVED)
+  processingError String?
+  attempts        Int             @default(0)
+  receivedAt      DateTime        @default(now()) @db.Timestamptz(3)
+  processedAt     DateTime?       @db.Timestamptz(3)
+
+  payment         Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  @@unique([provider, eventId])
+  @@index([status, receivedAt])
+}
+
+model Refund {
+  id             String       @id @default(cuid())
+  paymentId      String
+  idempotencyKey String       @unique
+  amount         BigInt
+  reason         String
+  status         RefundStatus @default(REQUESTED)
+  destination    String // ORIGINAL_METHOD | WALLET
+  providerRef    String?
+  approvedById   String?
+  disputeId      String?
+  createdAt      DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime     @updatedAt @db.Timestamptz(3)
+
+  payment        Payment       @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  approvedBy     AdminProfile? @relation(fields: [approvedById], references: [id], onDelete: SetNull)
+  dispute        Dispute?      @relation(fields: [disputeId], references: [id], onDelete: SetNull)
+
+  @@index([paymentId])
+  @@index([status])
+}
+
+model Withdrawal {
+  id             String           @id @default(cuid())
+  walletId       String
+  idempotencyKey String           @unique
+  amount         BigInt
+  feeAmount      BigInt           @default(0)
+  bankName       String
+  bankAccountLast4 String
+  recipientCode  String
+  provider       PaymentProvider
+  providerRef    String?
+  status         WithdrawalStatus @default(REQUESTED)
+  rejectionReason String?
+  approvedById   String?
+  approvedAt     DateTime?        @db.Timestamptz(3)
+  completedAt    DateTime?        @db.Timestamptz(3)
+  createdAt      DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime         @updatedAt @db.Timestamptz(3)
+
+  wallet         Wallet        @relation(fields: [walletId], references: [id], onDelete: Restrict)
+  approvedBy     AdminProfile? @relation(fields: [approvedById], references: [id], onDelete: SetNull)
+
+  @@index([walletId, createdAt])
+  @@index([status])
+}
+
+// Exactly one per completed ride (unique rideId) — this is what prevents double commission.
+model Commission {
+  id                  String           @id @default(cuid())
+  rideId              String           @unique
+  driverId            String
+  grossFare           BigInt
+  commissionBps       Int
+  amount              BigInt
+  status              CommissionStatus @default(CALCULATED)
+  ledgerTransactionId String?          @unique
+  createdAt           DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime         @updatedAt @db.Timestamptz(3)
+
+  ride                Ride               @relation(fields: [rideId], references: [id], onDelete: Restrict)
+  driver              Driver             @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  ledgerTransaction   LedgerTransaction? @relation(fields: [ledgerTransactionId], references: [id], onDelete: Restrict)
+
+  @@index([driverId, createdAt])
+  @@index([status])
+}
+
+// Daily provider settlement reconciliation (what Paystack/Flutterwave paid out vs our ledger).
+model Settlement {
+  id              String           @id @default(cuid())
+  provider        PaymentProvider
+  settlementDate  DateTime         @db.Date
+  providerRef     String?
+  expectedAmount  BigInt
+  settledAmount   BigInt?
+  feeAmount       BigInt?
+  status          SettlementStatus @default(OPEN)
+  notes           String?
+  createdAt       DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime         @updatedAt @db.Timestamptz(3)
+
+  items           SettlementItem[]
+
+  @@unique([provider, settlementDate])
+}
+
+model SettlementItem {
+  settlementId String
+  paymentId    String
+  matched      Boolean @default(false)
+
+  settlement   Settlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+  payment      Payment    @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+
+  @@id([settlementId, paymentId])
+}
+
+model Invoice {
+  id        String   @id @default(cuid())
+  number    String   @unique
+  rideId    String   @unique
+  fileId    String?
+  lineItems Json // [{ label, amount }]
+  total     BigInt
+  issuedAt  DateTime @default(now()) @db.Timestamptz(3)
+
+  ride      Ride        @relation(fields: [rideId], references: [id], onDelete: Restrict)
+  file      FileObject? @relation(fields: [fileId], references: [id], onDelete: SetNull)
+}
+
+model Receipt {
+  id        String   @id @default(cuid())
+  number    String   @unique
+  rideId    String   @unique
+  fileId    String?
+  amountPaid BigInt
+  method    PaymentMethodType
+  issuedAt  DateTime @default(now()) @db.Timestamptz(3)
+  emailedAt DateTime? @db.Timestamptz(3)
+
+  ride      Ride        @relation(fields: [rideId], references: [id], onDelete: Restrict)
+  file      FileObject? @relation(fields: [fileId], references: [id], onDelete: SetNull)
+}
+
+// -----------------------------------------------------------------------------
+// COMMUNICATION
+// -----------------------------------------------------------------------------
+
+model Conversation {
+  id        String           @id @default(cuid())
+  type      ConversationType
+  rideId    String?          @unique
+  ticketId  String?          @unique
+  closedAt  DateTime?        @db.Timestamptz(3) // ride chats lock N hours after completion
+  createdAt DateTime         @default(now()) @db.Timestamptz(3)
+
+  ride         Ride?                     @relation(fields: [rideId], references: [id], onDelete: Restrict)
+  ticket       SupportTicket?            @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  participants ConversationParticipant[]
+  messages     Message[]
+}
+
+model ConversationParticipant {
+  conversationId String
+  userId         String
+  role           RoleScope
+  lastReadMessageId String?
+  lastReadAt     DateTime? @db.Timestamptz(3)
+  mutedAt        DateTime? @db.Timestamptz(3)
+  joinedAt       DateTime  @default(now()) @db.Timestamptz(3)
+
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@id([conversationId, userId])
+}
+
+model Message {
+  id             String      @id @default(cuid())
+  conversationId String
+  senderId       String?
+  clientMessageId String     // client-generated; dedupes resends
+  type           MessageType @default(TEXT)
+  body           String?
+  attachmentId   String?
+  deliveredAt    DateTime?   @db.Timestamptz(3)
+  isFlagged      Boolean     @default(false) // safety filter (phone numbers, abuse)
+  createdAt      DateTime    @default(now()) @db.Timestamptz(3)
+
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Restrict)
+  sender         User?        @relation(fields: [senderId], references: [id], onDelete: SetNull)
+  attachment     FileObject?  @relation(fields: [attachmentId], references: [id], onDelete: SetNull)
+
+  @@unique([conversationId, clientMessageId])
+  @@index([conversationId, createdAt])
+}
+
+model Notification {
+  id          String              @id @default(cuid())
+  userId      String
+  channel     NotificationChannel
+  templateKey String?
+  title       String?
+  body        String
+  data        Json?
+  status      NotificationStatus  @default(QUEUED)
+  providerRef String?
+  error       String?
+  campaignId  String?
+  sentAt      DateTime?           @db.Timestamptz(3)
+  readAt      DateTime?           @db.Timestamptz(3)
+  createdAt   DateTime            @default(now()) @db.Timestamptz(3)
+
+  user        User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaign    NotificationCampaign?  @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([status])
+}
+
+model NotificationTemplate {
+  key       String   @id // ride.driver_arrived, payment.receipt ...
+  channel   NotificationChannel
+  locale    String   @default("en")
+  title     String?
+  body      String // with {{placeholders}}
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+}
+
+model NotificationCampaign {
+  id          String    @id @default(cuid())
+  name        String
+  audience    PromotionAudience
+  cityId      String?
+  channels    NotificationChannel[]
+  title       String?
+  body        String
+  isMarketing Boolean   @default(false) // respects marketingConsent
+  scheduledAt DateTime? @db.Timestamptz(3)
+  sentAt      DateTime? @db.Timestamptz(3)
+  createdById String?
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+
+  notifications Notification[]
+}
+
+model NotificationPreference {
+  userId    String
+  channel   NotificationChannel
+  category  String // TRIP, PAYMENT, PROMOTIONS, SAFETY (SAFETY cannot be disabled)
+  enabled   Boolean @default(true)
+
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, channel, category])
+}
+
+model PushToken {
+  id        String         @id @default(cuid())
+  userId    String
+  deviceId  String?
+  token     String         @unique // Expo push token or FCM/APNs token
+  platform  DevicePlatform
+  isActive  Boolean        @default(true)
+  createdAt DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime       @updatedAt @db.Timestamptz(3)
+
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device    Device? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+
+  @@index([userId, isActive])
+}
+
+// -----------------------------------------------------------------------------
+// PROMOTIONS & REFERRALS
+// -----------------------------------------------------------------------------
+
+model Promotion {
+  id          String            @id @default(cuid())
+  name        String
+  description String?
+  audience    PromotionAudience
+  cityId      String?
+  budget      BigInt? // total spend cap in kobo
+  spent       BigInt            @default(0)
+  startsAt    DateTime          @db.Timestamptz(3)
+  endsAt      DateTime          @db.Timestamptz(3)
+  isActive    Boolean           @default(true)
+  rules       Json? // driver incentives: { tripsRequired: 20, window: "7d", reward: 500000 }
+  createdAt   DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime          @updatedAt @db.Timestamptz(3)
+
+  city        City?       @relation(fields: [cityId], references: [id], onDelete: Restrict)
+  promoCodes  PromoCode[]
+}
+
+model PromoCode {
+  id              String            @id @default(cuid())
+  promotionId     String
+  code            String            @unique @db.Citext
+  discountType    PromoDiscountType
+  discountValue   Int // bps for PERCENTAGE, kobo for FIXED_AMOUNT
+  maxDiscount     BigInt?
+  minFare         BigInt?
+  usageLimit      Int?
+  perUserLimit    Int               @default(1)
+  usedCount       Int               @default(0)
+  categoryKeys    String[]
+  firstRideOnly   Boolean           @default(false)
+  startsAt        DateTime          @db.Timestamptz(3)
+  endsAt          DateTime          @db.Timestamptz(3)
+  isActive        Boolean           @default(true)
+  createdAt       DateTime          @default(now()) @db.Timestamptz(3)
+
+  promotion       Promotion         @relation(fields: [promotionId], references: [id], onDelete: Restrict)
+  redemptions     PromoRedemption[]
+  rideRequests    RideRequest[]
+}
+
+model PromoRedemption {
+  id          String   @id @default(cuid())
+  promoCodeId String
+  userId      String
+  rideId      String?  @unique
+  amount      BigInt
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  promoCode   PromoCode @relation(fields: [promoCodeId], references: [id], onDelete: Restrict)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  ride        Ride?     @relation(fields: [rideId], references: [id], onDelete: Restrict)
+
+  @@index([promoCodeId, userId])
+}
+
+model Referral {
+  id            String         @id @default(cuid())
+  referrerId    String
+  refereeId     String         @unique // a user can only be referred once
+  refereeRole   RoleScope
+  status        ReferralStatus @default(PENDING)
+  qualifyingRule Json? // { completedTrips: 1 } or { completedTrips: 10 } for drivers
+  qualifiedAt   DateTime?      @db.Timestamptz(3)
+  fraudSignals  Json? // same device, same payment card, same phone prefix burst...
+  createdAt     DateTime       @default(now()) @db.Timestamptz(3)
+
+  referrer      User             @relation("Referrer", fields: [referrerId], references: [id], onDelete: Restrict)
+  referee       User             @relation("Referee", fields: [refereeId], references: [id], onDelete: Restrict)
+  rewards       ReferralReward[]
+
+  @@index([referrerId])
+}
+
+model ReferralReward {
+  id                  String   @id @default(cuid())
+  referralId          String
+  beneficiaryUserId   String
+  amount              BigInt
+  ledgerTransactionId String?  @unique
+  paidAt              DateTime? @db.Timestamptz(3)
+  createdAt           DateTime @default(now()) @db.Timestamptz(3)
+
+  referral            Referral @relation(fields: [referralId], references: [id], onDelete: Restrict)
+
+  @@unique([referralId, beneficiaryUserId])
+}
+
+// -----------------------------------------------------------------------------
+// SUPPORT, DISPUTES, SAFETY, AUDIT
+// -----------------------------------------------------------------------------
+
+model SupportTicket {
+  id           String         @id @default(cuid())
+  number       String         @unique // T-000123
+  requesterId  String
+  rideId       String?
+  category     TicketCategory
+  priority     TicketPriority @default(NORMAL)
+  status       TicketStatus   @default(OPEN)
+  subject      String
+  assigneeId   String?
+  resolution   String?
+  resolvedAt   DateTime?      @db.Timestamptz(3)
+  createdAt    DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime       @updatedAt @db.Timestamptz(3)
+
+  requester    User                 @relation("TicketRequester", fields: [requesterId], references: [id], onDelete: Restrict)
+  ride         Ride?                @relation(fields: [rideId], references: [id], onDelete: Restrict)
+  assignee     AdminProfile?        @relation("TicketAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  messages     SupportMessage[]
+  attachments  EvidenceAttachment[]
+  dispute      Dispute?
+  conversation Conversation?
+
+  @@index([status, priority])
+  @@index([requesterId])
+  @@index([assigneeId, status])
+}
+
+model SupportMessage {
+  id         String   @id @default(cuid())
+  ticketId   String
+  authorId   String
+  body       String
+  isInternal Boolean  @default(false) // admin-only notes
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+
+  ticket     SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  author     User          @relation(fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@index([ticketId, createdAt])
+}
+
+model Dispute {
+  id             String        @id @default(cuid())
+  rideId         String
+  ticketId       String?       @unique
+  raisedByType   ActorType
+  reason         String
+  disputedAmount BigInt?
+  status         DisputeStatus @default(OPEN)
+  handlerId      String?
+  outcomeNotes   String?
+  resolvedAt     DateTime?     @db.Timestamptz(3)
+  createdAt      DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime      @updatedAt @db.Timestamptz(3)
+
+  ride           Ride                 @relation(fields: [rideId], references: [id], onDelete: Restrict)
+  ticket         SupportTicket?       @relation(fields: [ticketId], references: [id], onDelete: SetNull)
+  handler        AdminProfile?        @relation(fields: [handlerId], references: [id], onDelete: SetNull)
+  refunds        Refund[]
+  attachments    EvidenceAttachment[]
+
+  @@index([status])
+  @@index([rideId])
+}
+
+model SafetyIncident {
+  id             String               @id @default(cuid())
+  type           SafetyIncidentType
+  status         SafetyIncidentStatus @default(TRIGGERED)
+  reporterId     String
+  reporterRole   RoleScope
+  rideId         String?
+  lat            Float?
+  lng            Float?
+  description    String?
+  contactsNotifiedAt DateTime?        @db.Timestamptz(3)
+  // Set ONLY when an operator confirms they actually reached external services.
+  externalEscalatedAt DateTime?       @db.Timestamptz(3)
+  externalEscalationNote String?
+  handlerId      String?
+  acknowledgedAt DateTime?            @db.Timestamptz(3)
+  resolvedAt     DateTime?            @db.Timestamptz(3)
+  timeline       Json? // append-only array of {at, actor, event}
+  createdAt      DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime             @updatedAt @db.Timestamptz(3)
+
+  reporter       User                 @relation("IncidentReporter", fields: [reporterId], references: [id], onDelete: Restrict)
+  ride           Ride?                @relation(fields: [rideId], references: [id], onDelete: Restrict)
+  handler        AdminProfile?        @relation("IncidentHandler", fields: [handlerId], references: [id], onDelete: SetNull)
+  attachments    EvidenceAttachment[]
+
+  @@index([status, createdAt])
+  @@index([rideId])
+}
+
+model EvidenceAttachment {
+  id               String   @id @default(cuid())
+  fileId           String
+  ticketId         String?
+  disputeId        String?
+  safetyIncidentId String?
+  caption          String?
+  createdAt        DateTime @default(now()) @db.Timestamptz(3)
+
+  file             FileObject      @relation(fields: [fileId], references: [id], onDelete: Restrict)
+  ticket           SupportTicket?  @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  dispute          Dispute?        @relation(fields: [disputeId], references: [id], onDelete: Restrict)
+  safetyIncident   SafetyIncident? @relation(fields: [safetyIncidentId], references: [id], onDelete: Restrict)
+}
+
+// What an admin DID (operational actions: suspend, approve doc, approve withdrawal).
+model AdminActionLog {
+  id         String   @id @default(cuid())
+  adminId    String
+  action     String // drivers.approve, users.suspend, withdrawals.approve ...
+  targetType String
+  targetId   String
+  reason     String?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+
+  admin      AdminProfile @relation(fields: [adminId], references: [id], onDelete: Restrict)
+
+  @@index([adminId, createdAt])
+  @@index([targetType, targetId])
+}
+
+// What CHANGED (row-level before/after for config, pricing, roles, settings).
+// Append-only; DB role used by the app has INSERT but not UPDATE/DELETE on this table.
+model AuditLog {
+  id         String   @id @default(cuid())
+  adminId    String?
+  actorType  ActorType
+  entity     String
+  entityId   String
+  operation  String // CREATE | UPDATE | DELETE
+  before     Json?
+  after      Json?
+  requestId  String?
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+
+  admin      AdminProfile? @relation(fields: [adminId], references: [id], onDelete: Restrict)
+
+  @@index([entity, entityId, createdAt])
+  @@index([adminId, createdAt])
+}
+
+// Generic idempotency store for mutating endpoints (Idempotency-Key header).
+model IdempotencyRecord {
+  key          String   @id
+  userId       String?
+  route        String
+  requestHash  String
+  responseCode Int?
+  responseBody Json?
+  lockedUntil  DateTime? @db.Timestamptz(3)
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  expiresAt    DateTime @db.Timestamptz(3)
+
+  @@index([expiresAt])
+}

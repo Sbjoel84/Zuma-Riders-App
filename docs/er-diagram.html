@@ -1,0 +1,752 @@
+<title>Ride Platform Data Model</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column, domain sections stacked, wide diagrams scroll inside their own frame */
+:root{
+  --bg:#f6f7f4; --surface:#ffffff; --ink:#18201c; --muted:#5b6660; --line:#d9ded8;
+  --accent:#0e7a5f; --accent-soft:#e1f1ea;
+  --display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body:"IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#111613; --surface:#18201c; --ink:#e7ece8; --muted:#9aa7a0; --line:#2a342f;
+  --accent:#4cc9a0; --accent-soft:#163128; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111613; --surface:#18201c; --ink:#e7ece8; --muted:#9aa7a0; --line:#2a342f;
+  --accent:#4cc9a0; --accent-soft:#163128; color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--body)}
+.wrap{max-width:1100px;margin:0 auto;padding-block:40px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:40px}
+h1,h2{font-family:var(--display);text-wrap:balance;margin:0;line-height:1.15}
+h1{font-size:clamp(28px,4vw,40px);font-weight:700;letter-spacing:-.01em}
+h2{font-size:22px;font-weight:700}
+.lede{max-width:68ch;color:var(--muted);margin:10px 0 0}
+.stats{display:flex;flex-wrap:wrap;gap:8px 24px;margin:18px 0 0;padding:0;list-style:none;font-family:var(--mono);font-size:13px;color:var(--muted)}
+.stats b{color:var(--ink);font-weight:500;font-variant-numeric:tabular-nums}
+nav ul{display:flex;flex-wrap:wrap;gap:8px;list-style:none;margin:0;padding:0}
+nav a{display:inline-block;padding:6px 12px;border:1px solid var(--line);border-radius:999px;color:var(--ink);text-decoration:none;font-size:13px;background:var(--surface)}
+nav a:hover{border-color:var(--accent);color:var(--accent)}
+nav a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px 28px;font-size:13px;color:var(--muted);border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding-block:16px}
+.legend code,.ext code{font-family:var(--mono);font-size:12px;color:var(--ink)}
+.legend strong{display:block;color:var(--ink);font-weight:500;margin-bottom:2px;font-size:12px;letter-spacing:.06em;text-transform:uppercase}
+.domain{display:grid;gap:10px;scroll-margin-top:16px}
+.dh{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 16px}
+.meta{margin:0;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.blurb{margin:0;max-width:68ch}
+.note{margin:0;max-width:72ch;font-size:14px;color:var(--muted);padding-left:12px;border-left:2px solid var(--accent)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;list-style:none;margin:4px 0 0;padding:0}
+.chips li{font-family:var(--mono);font-size:12px;padding:2px 8px;border-radius:4px;background:var(--accent-soft);color:var(--ink)}
+.ext{margin:0;font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:6px;align-items:baseline}
+.ext span{font-size:11px;letter-spacing:.06em;text-transform:uppercase;margin-right:4px}
+.diagram{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:16px;min-width:0}
+.diagram pre{margin:0}
+footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);padding-top:16px}
+footer code{font-family:var(--mono);font-size:12px}
+</style>
+<div class="wrap">
+<header>
+  <h1>Ride Platform Data Model</h1>
+  <p class="lede">Entity-relationship diagrams for the inDrive-style ride-hailing platform, generated directly from <code>schema.prisma</code>. Each domain shows its own tables and the foreign keys they hold; tables from other domains appear as empty boxes where they are referenced.</p>
+  <ul class="stats"><li><b>72</b> tables</li><li><b>45</b> enums</li><li><b>126</b> foreign keys</li><li>PostgreSQL + PostGIS · Prisma 7.10</li></ul>
+</header>
+<nav aria-label="Domains"><ul><li><a href="#identity">Identity &amp; access</a></li><li><a href="#supply">Drivers &amp; vehicles</a></li><li><a href="#geo">Cities &amp; pricing</a></li><li><a href="#rides">Rides &amp; negotiation</a></li><li><a href="#ledger">Wallets &amp; ledger</a></li><li><a href="#payments">Payments</a></li><li><a href="#comms">Messaging &amp; notifications</a></li><li><a href="#growth">Promotions &amp; referrals</a></li><li><a href="#trust">Support, safety &amp; audit</a></li><li><a href="#map">Domain map</a></li></ul></nav>
+<div class="legend">
+  <div><strong>Keys</strong><code>PK</code> primary · <code>FK</code> foreign · <code>UK</code> unique</div>
+  <div><strong>Cardinality</strong><code>||--o{</code> one to many · <code>||--o|</code> one to one · <code>|o</code> optional parent</div>
+  <div><strong>Money</strong>BigInt kobo everywhere; percentages in basis points</div>
+  <div><strong>Attributes shown</strong>Keys, status and amount columns. The full column list is in the schema file.</div>
+</div>
+
+<section class="domain" id="identity">
+  <header class="dh">
+    <h2>Identity &amp; access</h2>
+    <p class="meta">13 tables · 16 foreign keys</p>
+  </header>
+  <p class="blurb">Users, profiles, sessions, OTP, devices and role-based permissions.</p>
+  <p class="note">Refresh tokens rotate; reuse of a revoked token revokes the whole session family. Closing an account scrubs PII but keeps the User row so trips and ledger history stay intact.</p>
+  <ul class="chips"><li>User</li><li>PassengerProfile</li><li>AdminProfile</li><li>Role</li><li>Permission</li><li>RolePermission</li><li>UserRole</li><li>UserSession</li><li>OtpVerification</li><li>Device</li><li>EmergencyContact</li><li>SavedPlace</li><li>FileObject</li></ul>
+  <p class="ext"><span>Links out to</span> <code>City</code></p>
+  <div class="diagram"><pre class="mermaid">erDiagram
+  User {
+    String id PK
+    String phoneE164 UK
+    String email UK
+    String avatarFileId FK
+    UserStatus status
+    String referralCode UK
+  }
+  PassengerProfile {
+    String id PK
+    String userId FK,UK
+  }
+  AdminProfile {
+    String id PK
+    String userId FK,UK
+  }
+  Role {
+    String id PK
+    String key UK
+  }
+  Permission {
+    String id PK
+    String key UK
+  }
+  RolePermission {
+    String roleId FK
+    String permissionId FK
+  }
+  UserRole {
+    String userId FK
+    String roleId FK
+    String cityId FK
+    String grantedById FK
+  }
+  UserSession {
+    String id PK
+    String userId FK
+    String deviceId FK
+    String refreshTokenHash UK
+  }
+  OtpVerification {
+    String id PK
+    String userId FK
+    OtpPurpose purpose
+  }
+  Device {
+    String id PK
+    String userId FK
+  }
+  EmergencyContact {
+    String id PK
+    String userId FK
+  }
+  SavedPlace {
+    String id PK
+    String userId FK
+  }
+  FileObject {
+    String id PK
+    String uploaderId FK
+    String objectKey UK
+  }
+  FileObject |o--o{ User : "avatarFile"
+  User ||--o| PassengerProfile : "user"
+  User ||--o| AdminProfile : "user"
+  Role ||--o{ RolePermission : "role"
+  Permission ||--o{ RolePermission : "permission"
+  User ||--o{ UserRole : "user"
+  Role ||--o{ UserRole : "role"
+  City |o--o{ UserRole : "city"
+  User |o--o{ UserRole : "grantedBy"
+  User ||--o{ UserSession : "user"
+  Device |o--o{ UserSession : "device"
+  User |o--o{ OtpVerification : "user"
+  User ||--o{ Device : "user"
+  User ||--o{ EmergencyContact : "user"
+  User ||--o{ SavedPlace : "user"
+  User |o--o{ FileObject : "uploader"
+</pre></div>
+</section>
+
+<section class="domain" id="supply">
+  <header class="dh">
+    <h2>Drivers &amp; vehicles</h2>
+    <p class="meta">8 tables · 16 foreign keys</p>
+  </header>
+  <p class="blurb">Driver onboarding, KYC documents, vehicles and live availability.</p>
+  <p class="note">Hot availability and location live in Redis; these tables are the durable mirror and verification history.</p>
+  <ul class="chips"><li>Driver</li><li>DriverDocument</li><li>DriverVerification</li><li>DriverAvailability</li><li>DriverLocation</li><li>Vehicle</li><li>VehicleCategory</li><li>VehicleDocument</li></ul>
+  <p class="ext"><span>Links out to</span> <code>AdminProfile</code> <code>City</code> <code>FileObject</code> <code>ServiceArea</code> <code>User</code></p>
+  <div class="diagram"><pre class="mermaid">erDiagram
+  Driver {
+    String id PK
+    String userId FK,UK
+    String cityId FK
+    String activeVehicleId FK,UK
+  }
+  DriverDocument {
+    String id PK
+    String driverId FK
+    DriverDocumentType type
+    String fileId FK
+    DocumentStatus status
+    String reviewedById FK
+  }
+  DriverVerification {
+    String id PK
+    String driverId FK
+    String reviewerId FK
+  }
+  DriverAvailability {
+    String driverId PK,FK
+    AvailabilityStatus status
+    String serviceAreaId FK
+  }
+  DriverLocation {
+    BigInt id PK
+    String driverId FK
+  }
+  Vehicle {
+    String id PK
+    String driverId FK
+    String categoryId FK
+    String plateNumber UK
+    String vin UK
+    VehicleStatus status
+  }
+  VehicleCategory {
+    String id PK
+    String key UK
+  }
+  VehicleDocument {
+    String id PK
+    String vehicleId FK
+    VehicleDocumentType type
+    String fileId FK
+    DocumentStatus status
+    String reviewedById FK
+  }
+  User ||--o| Driver : "user"
+  City ||--o{ Driver : "city"
+  Vehicle |o--o| Driver : "activeVehicle"
+  Driver ||--o{ DriverDocument : "driver"
+  FileObject ||--o{ DriverDocument : "file"
+  AdminProfile |o--o{ DriverDocument : "reviewedBy"
+  Driver ||--o{ Vehicle : "driver"
+  VehicleCategory ||--o{ Vehicle : "category"
+  Vehicle ||--o{ VehicleDocument : "vehicle"
+  FileObject ||--o{ VehicleDocument : "file"
+  AdminProfile |o--o{ VehicleDocument : "reviewedBy"
+  Driver ||--o{ DriverVerification : "driver"
+  AdminProfile |o--o{ DriverVerification : "reviewer"
+  Driver ||--o| DriverAvailability : "driver"
+  ServiceArea |o--o{ DriverAvailability : "serviceArea"
+  Driver ||--o{ DriverLocation : "driver"
+</pre></div>
+</section>
+
+<section class="domain" id="geo">
+  <header class="dh">
+    <h2>Cities &amp; pricing</h2>
+    <p class="meta">5 tables · 6 foreign keys</p>
+  </header>
+  <p class="blurb">Cities, PostGIS service areas, per-category pricing versions and settings.</p>
+  <p class="note">Pricing rows are never edited. A change inserts a new version; requests snapshot the version they were validated against.</p>
+  <ul class="chips"><li>City</li><li>CityVehicleCategory</li><li>ServiceArea</li><li>PricingConfiguration</li><li>PlatformSetting</li></ul>
+  <p class="ext"><span>Links out to</span> <code>AdminProfile</code> <code>VehicleCategory</code></p>
+  <div class="diagram"><pre class="mermaid">erDiagram
+  City {
+    String id PK
+    String key UK
+  }
+  CityVehicleCategory {
+    String cityId FK
+    String categoryId FK
+  }
+  ServiceArea {
+    String id PK
+    String cityId FK
+    ServiceAreaStatus status
+  }
+  PricingConfiguration {
+    String id PK
+    String serviceAreaId FK
+    String categoryId FK
+    String createdById FK
+  }
+  PlatformSetting {
+    String key PK
+  }
+  City ||--o{ CityVehicleCategory : "city"
+  VehicleCategory ||--o{ CityVehicleCategory : "category"
+  City ||--o{ ServiceArea : "city"
+  ServiceArea ||--o{ PricingConfiguration : "serviceArea"
+  VehicleCategory ||--o{ PricingConfiguration : "category"
+  AdminProfile |o--o{ PricingConfiguration : "createdBy"
+</pre></div>
+</section>
+
+<section class="domain" id="rides">
+  <header class="dh">
+    <h2>Rides &amp; negotiation</h2>
+    <p class="meta">10 tables · 25 foreign keys</p>
+  </header>
+  <p class="blurb">From the passenger's proposed fare through driver offers to the confirmed trip.</p>
+  <p class="note">A Ride row is created only when the passenger accepts an offer. Unique keys on rideRequestId and acceptedOfferId, plus a partial unique index on active rides per driver, make double assignment impossible in the database. agreedFare is locked by trigger.</p>
+  <ul class="chips"><li>RideRequest</li><li>RideDispatch</li><li>RideOffer</li><li>FareNegotiation</li><li>Ride</li><li>RideWaypoint</li><li>RideStatusHistory</li><li>RideLocation</li><li>RideCancellation</li><li>RideRating</li></ul>
+  <p class="ext"><span>Links out to</span> <code>City</code> <code>Driver</code> <code>PassengerProfile</code> <code>PricingConfiguration</code> <code>PromoCode</code> <code>ServiceArea</code> <code>User</code> <code>Vehicle</code> <code>VehicleCategory</code></p>
+  <div class="diagram"><pre class="mermaid">erDiagram
+  RideRequest {
+    String id PK
+    String code UK
+    String passengerId FK
+    String cityId FK
+    String serviceAreaId FK
+    String categoryId FK
+    String pricingConfigId FK
+    RideStatus status
+    BigInt proposedFare
+    String promoCodeId FK
+    String idempotencyKey UK
+  }
+  RideDispatch {
+    String rideRequestId FK
+  }
+  RideOffer {
+    String id PK
+    String rideRequestId FK
+    String driverId FK
+    String vehicleId FK
+    BigInt amount
+    OfferStatus status
+  }
+  FareNegotiation {
+    String id PK
+    String rideRequestId FK
+    String offerId FK
+    BigInt amount
+  }
+  Ride {
+    String id PK
+    String code UK
+    String rideRequestId FK,UK
+    String acceptedOfferId FK,UK
+    String passengerId FK
+    String driverId FK
+    String vehicleId FK
+    RideStatus status
+    BigInt agreedFare
+    String shareToken UK
+  }
+  RideWaypoint {
+    String id PK
+    String rideRequestId FK
+    WaypointType type
+  }
+  RideStatusHistory {
+    String id PK
+    String rideId FK
+  }
+  RideLocation {
+    BigInt id PK
+    String rideId FK
+  }
+  RideCancellation {
+    String id PK
+    String rideId FK,UK
+    String cancelledById FK
+  }
+  RideRating {
+    String id PK
+    String rideId FK
+    String raterId FK
+    String rateeId FK
+  }
+  PassengerProfile ||--o{ RideRequest : "passenger"
+  City ||--o{ RideRequest : "city"
+  ServiceArea ||--o{ RideRequest : "serviceArea"
+  VehicleCategory ||--o{ RideRequest : "category"
+  PricingConfiguration ||--o{ RideRequest : "pricingConfig"
+  PromoCode |o--o{ RideRequest : "promoCode"
+  RideRequest ||--o{ RideDispatch : "rideRequest"
+  RideRequest ||--o{ RideOffer : "rideRequest"
+  Driver ||--o{ RideOffer : "driver"
+  Vehicle ||--o{ RideOffer : "vehicle"
+  RideRequest ||--o{ FareNegotiation : "rideRequest"
+  RideOffer |o--o{ FareNegotiation : "offer"
+  RideRequest ||--o| Ride : "rideRequest"
+  RideOffer ||--o| Ride : "acceptedOffer"
+  PassengerProfile ||--o{ Ride : "passenger"
+  Driver ||--o{ Ride : "driver"
+  Vehicle ||--o{ Ride : "vehicle"
+  RideRequest ||--o{ RideWaypoint : "rideRequest"
+  Ride ||--o{ RideStatusHistory : "ride"
+  Ride ||--o{ RideLocation : "ride"
+  Ride ||--o| RideCancellation : "ride"
+  User |o--o{ RideCancellation : "cancelledBy"
+  Ride ||--o{ RideRating : "ride"
+  User ||--o{ RideRating : "rater"
+  User ||--o{ RideRating : "ratee"
+</pre></div>
+</section>
+
+<section class="domain" id="ledger">
+  <header class="dh">
+    <h2>Wallets &amp; ledger</h2>
+    <p class="meta">7 tables · 12 foreign keys</p>
+  </header>
+  <p class="blurb">Double-entry journal; wallet balances are caches of ledger accounts.</p>
+  <p class="note">Every money movement is a LedgerTransaction whose entries balance (deferred trigger). Wallet balances are caches updated in the same transaction. Commission is unique per ride, so it cannot be charged twice.</p>
+  <ul class="chips"><li>Wallet</li><li>LedgerAccount</li><li>LedgerTransaction</li><li>LedgerEntry</li><li>WalletTransaction</li><li>Commission</li><li>Withdrawal</li></ul>
+  <p class="ext"><span>Links out to</span> <code>AdminProfile</code> <code>Driver</code> <code>Ride</code> <code>User</code></p>
+  <div class="diagram"><pre class="mermaid">erDiagram
+  Wallet {
+    String id PK
+    String userId FK
+  }
+  LedgerAccount {
+    String id PK
+    String code UK
+    LedgerAccountType type
+    LedgerAccountPurpose purpose
+    String walletId FK
+  }
+  LedgerTransaction {
+    String id PK
+    LedgerTxnType type
+    String idempotencyKey UK
+    String reversesId FK,UK
+  }
+  LedgerEntry {
+    String id PK
+    String transactionId FK
+    String accountId FK
+    EntryDirection direction
+    BigInt amount
+  }
+  WalletTransaction {
+    String id PK
+    String walletId FK
+    String ledgerTransactionId FK
+    LedgerTxnType type
+    EntryDirection direction
+    BigInt amount
+    WalletTxnStatus status
+  }
+  Commission {
+    String id PK
+    String rideId FK,UK
+    String driverId FK
+    BigInt amount
+    CommissionStatus status
+    String ledgerTransactionId FK,UK
+  }
+  Withdrawal {
+    String id PK
+    String walletId FK
+    String idempotencyKey UK
+    BigInt amount
+    WithdrawalStatus status
+    String approvedById FK
+  }
+  User ||--o{ Wallet : "user"
+  Wallet |o--o{ LedgerAccount : "wallet"
+  LedgerTransaction |o--o| LedgerTransaction : "reverses"
+  LedgerTransaction ||--o{ LedgerEntry : "transaction"
+  LedgerAccount ||--o{ LedgerEntry : "account"
+  Wallet ||--o{ WalletTransaction : "wallet"
+  LedgerTransaction ||--o{ WalletTransaction : "ledgerTransaction"
+  Wallet ||--o{ Withdrawal : "wallet"
+  AdminProfile |o--o{ Withdrawal : "approvedBy"
+  Ride ||--o| Commission : "ride"
+  Driver ||--o{ Commission : "driver"
+  LedgerTransaction |o--o| Commission : "ledgerTransaction"
+</pre></div>
+</section>
+
+<section class="domain" id="payments">
+  <header class="dh">
+    <h2>Payments</h2>
+    <p class="meta">8 tables · 14 foreign keys</p>
+  </header>
+  <p class="blurb">Provider payments, verified webhooks, refunds, settlements and receipts.</p>
+  <p class="note">A payment is SUCCEEDED only after server-side verification. Webhooks are stored raw first and de-duplicated on the provider event id.</p>
+  <ul class="chips"><li>Payment</li><li>PaymentMethod</li><li>PaymentWebhook</li><li>Refund</li><li>Settlement</li><li>SettlementItem</li><li>Invoice</li><li>Receipt</li></ul>
+  <p class="ext"><span>Links out to</span> <code>AdminProfile</code> <code>Dispute</code> <code>FileObject</code> <code>Ride</code> <code>User</code></p>
+  <div class="diagram"><pre class="mermaid">erDiagram
+  Payment {
+    String id PK
+    String reference UK
+    String idempotencyKey UK
+    String userId FK
+    String rideId FK
+    String paymentMethodId FK
+    PaymentPurpose purpose
+    BigInt amount
+    PaymentStatus status
+  }
+  PaymentMethod {
+    String id PK
+    String userId FK
+    PaymentMethodType type
+  }
+  PaymentWebhook {
+    String id PK
+    String paymentId FK
+    WebhookStatus status
+  }
+  Refund {
+    String id PK
+    String paymentId FK
+    String idempotencyKey UK
+    BigInt amount
+    RefundStatus status
+    String approvedById FK
+    String disputeId FK
+  }
+  Settlement {
+    String id PK
+    SettlementStatus status
+  }
+  SettlementItem {
+    String settlementId FK
+    String paymentId FK
+  }
+  Invoice {
+    String id PK
+    String number UK
+    String rideId FK,UK
+    String fileId FK
+  }
+  Receipt {
+    String id PK
+    String number UK
+    String rideId FK,UK
+    String fileId FK
+  }
+  User ||--o{ PaymentMethod : "user"
+  User ||--o{ Payment : "user"
+  Ride |o--o{ Payment : "ride"
+  PaymentMethod |o--o{ Payment : "paymentMethod"
+  Payment |o--o{ PaymentWebhook : "payment"
+  Payment ||--o{ Refund : "payment"
+  AdminProfile |o--o{ Refund : "approvedBy"
+  Dispute |o--o{ Refund : "dispute"
+  Settlement ||--o{ SettlementItem : "settlement"
+  Payment ||--o{ SettlementItem : "payment"
+  Ride ||--o| Invoice : "ride"
+  FileObject |o--o{ Invoice : "file"
+  Ride ||--o| Receipt : "ride"
+  FileObject |o--o{ Receipt : "file"
+</pre></div>
+</section>
+
+<section class="domain" id="comms">
+  <header class="dh">
+    <h2>Messaging &amp; notifications</h2>
+    <p class="meta">8 tables · 12 foreign keys</p>
+  </header>
+  <p class="blurb">Ride chat, push tokens, templates, campaigns and preferences.</p>
+  <p class="note">Messages carry a client-generated id so resends after a network drop never duplicate.</p>
+  <ul class="chips"><li>Conversation</li><li>ConversationParticipant</li><li>Message</li><li>Notification</li><li>NotificationTemplate</li><li>NotificationCampaign</li><li>NotificationPreference</li><li>PushToken</li></ul>
+  <p class="ext"><span>Links out to</span> <code>Device</code> <code>FileObject</code> <code>Ride</code> <code>SupportTicket</code> <code>User</code></p>
+  <div class="diagram"><pre class="mermaid">erDiagram
+  Conversation {
+    String id PK
+    ConversationType type
+    String rideId FK,UK
+    String ticketId FK,UK
+  }
+  ConversationParticipant {
+    String conversationId FK
+    String userId FK
+  }
+  Message {
+    String id PK
+    String conversationId FK
+    String senderId FK
+    MessageType type
+    String attachmentId FK
+  }
+  Notification {
+    String id PK
+    String userId FK
+    NotificationStatus status
+    String campaignId FK
+  }
+  NotificationTemplate {
+    String key PK
+  }
+  NotificationCampaign {
+    String id PK
+  }
+  NotificationPreference {
+    String userId FK
+  }
+  PushToken {
+    String id PK
+    String userId FK
+    String deviceId FK
+    String token UK
+  }
+  Ride |o--o| Conversation : "ride"
+  SupportTicket |o--o| Conversation : "ticket"
+  Conversation ||--o{ ConversationParticipant : "conversation"
+  User ||--o{ ConversationParticipant : "user"
+  Conversation ||--o{ Message : "conversation"
+  User |o--o{ Message : "sender"
+  FileObject |o--o{ Message : "attachment"
+  User ||--o{ Notification : "user"
+  NotificationCampaign |o--o{ Notification : "campaign"
+  User ||--o{ NotificationPreference : "user"
+  User ||--o{ PushToken : "user"
+  Device |o--o{ PushToken : "device"
+</pre></div>
+</section>
+
+<section class="domain" id="growth">
+  <header class="dh">
+    <h2>Promotions &amp; referrals</h2>
+    <p class="meta">5 tables · 8 foreign keys</p>
+  </header>
+  <p class="blurb">Campaign budgets, promo codes, redemptions and referral rewards.</p>
+  <p class="note">A user can be referred once (unique refereeId); promo redemption is unique per ride.</p>
+  <ul class="chips"><li>Promotion</li><li>PromoCode</li><li>PromoRedemption</li><li>Referral</li><li>ReferralReward</li></ul>
+  <p class="ext"><span>Links out to</span> <code>City</code> <code>Ride</code> <code>User</code></p>
+  <div class="diagram"><pre class="mermaid">erDiagram
+  Promotion {
+    String id PK
+    String cityId FK
+  }
+  PromoCode {
+    String id PK
+    String promotionId FK
+    String code UK
+  }
+  PromoRedemption {
+    String id PK
+    String promoCodeId FK
+    String userId FK
+    String rideId FK,UK
+    BigInt amount
+  }
+  Referral {
+    String id PK
+    String referrerId FK
+    String refereeId FK,UK
+    ReferralStatus status
+  }
+  ReferralReward {
+    String id PK
+    String referralId FK
+    BigInt amount
+    String ledgerTransactionId UK
+  }
+  City |o--o{ Promotion : "city"
+  Promotion ||--o{ PromoCode : "promotion"
+  PromoCode ||--o{ PromoRedemption : "promoCode"
+  User ||--o{ PromoRedemption : "user"
+  Ride |o--o| PromoRedemption : "ride"
+  User ||--o{ Referral : "referrer"
+  User ||--o| Referral : "referee"
+  Referral ||--o{ ReferralReward : "referral"
+</pre></div>
+</section>
+
+<section class="domain" id="trust">
+  <header class="dh">
+    <h2>Support, safety &amp; audit</h2>
+    <p class="meta">8 tables · 17 foreign keys</p>
+  </header>
+  <p class="blurb">Tickets, disputes, SOS incidents, evidence and immutable audit trails.</p>
+  <p class="note">AuditLog, AdminActionLog and status histories are append-only, enforced by trigger and database grants.</p>
+  <ul class="chips"><li>SupportTicket</li><li>SupportMessage</li><li>Dispute</li><li>SafetyIncident</li><li>EvidenceAttachment</li><li>AdminActionLog</li><li>AuditLog</li><li>IdempotencyRecord</li></ul>
+  <p class="ext"><span>Links out to</span> <code>AdminProfile</code> <code>FileObject</code> <code>Ride</code> <code>User</code></p>
+  <div class="diagram"><pre class="mermaid">erDiagram
+  SupportTicket {
+    String id PK
+    String number UK
+    String requesterId FK
+    String rideId FK
+    TicketStatus status
+    String assigneeId FK
+  }
+  SupportMessage {
+    String id PK
+    String ticketId FK
+    String authorId FK
+  }
+  Dispute {
+    String id PK
+    String rideId FK
+    String ticketId FK,UK
+    DisputeStatus status
+    String handlerId FK
+  }
+  SafetyIncident {
+    String id PK
+    SafetyIncidentType type
+    SafetyIncidentStatus status
+    String reporterId FK
+    String rideId FK
+    String handlerId FK
+  }
+  EvidenceAttachment {
+    String id PK
+    String fileId FK
+    String ticketId FK
+    String disputeId FK
+    String safetyIncidentId FK
+  }
+  AdminActionLog {
+    String id PK
+    String adminId FK
+  }
+  AuditLog {
+    String id PK
+    String adminId FK
+  }
+  IdempotencyRecord {
+    String key PK
+  }
+  User ||--o{ SupportTicket : "requester"
+  Ride |o--o{ SupportTicket : "ride"
+  AdminProfile |o--o{ SupportTicket : "assignee"
+  SupportTicket ||--o{ SupportMessage : "ticket"
+  User ||--o{ SupportMessage : "author"
+  Ride ||--o{ Dispute : "ride"
+  SupportTicket |o--o| Dispute : "ticket"
+  AdminProfile |o--o{ Dispute : "handler"
+  User ||--o{ SafetyIncident : "reporter"
+  Ride |o--o{ SafetyIncident : "ride"
+  AdminProfile |o--o{ SafetyIncident : "handler"
+  FileObject ||--o{ EvidenceAttachment : "file"
+  SupportTicket |o--o{ EvidenceAttachment : "ticket"
+  Dispute |o--o{ EvidenceAttachment : "dispute"
+  SafetyIncident |o--o{ EvidenceAttachment : "safetyIncident"
+  AdminProfile ||--o{ AdminActionLog : "admin"
+  AdminProfile |o--o{ AuditLog : "admin"
+</pre></div>
+</section>
+<section class="domain" id="map">
+  <header class="dh"><h2>Domain map</h2><p class="meta">arrows point to the domain being referenced · label = number of foreign keys</p></header>
+  <div class="diagram"><pre class="mermaid">flowchart LR
+  identity["Identity and access"]
+  supply["Drivers and vehicles"]
+  geo["Cities and pricing"]
+  rides["Rides and negotiation"]
+  ledger["Wallets and ledger"]
+  payments["Payments"]
+  comms["Messaging and notifications"]
+  growth["Promotions and referrals"]
+  trust["Support, safety and audit"]
+  identity --&gt;|1| geo
+  supply --&gt;|6| identity
+  supply --&gt;|2| geo
+  geo --&gt;|2| supply
+  geo --&gt;|1| identity
+  rides --&gt;|5| identity
+  rides --&gt;|3| geo
+  rides --&gt;|5| supply
+  rides --&gt;|1| growth
+  ledger --&gt;|2| identity
+  payments --&gt;|5| identity
+  payments --&gt;|3| rides
+  payments --&gt;|1| trust
+  ledger --&gt;|1| rides
+  ledger --&gt;|1| supply
+  comms --&gt;|1| rides
+  comms --&gt;|1| trust
+  comms --&gt;|7| identity
+  growth --&gt;|1| geo
+  growth --&gt;|3| identity
+  growth --&gt;|1| rides
+  trust --&gt;|9| identity
+  trust --&gt;|3| rides
+</pre></div>
+</section>
+<footer>Source: <code>packages/database/prisma/schema.prisma</code> and <code>prisma/sql/001_integrity.sql</code>. Phase 1 · regenerate after every schema change.</footer>
+</div>

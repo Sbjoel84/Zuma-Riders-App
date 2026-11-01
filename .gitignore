@@ -1,0 +1,9 @@
+node_modules
+.env*
+!.env.example
+dist
+.turbo
+packages/database/src/generated
+packages/*/dist
+apps/*/dist
+.env

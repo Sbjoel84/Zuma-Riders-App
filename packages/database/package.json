@@ -1,0 +1,30 @@
+{
+  "name": "@zuma/database",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "scripts": {
+    "validate": "prisma validate",
+    "format": "prisma format",
+    "generate": "prisma generate",
+    "migrate:dev": "prisma migrate dev",
+    "migrate:deploy": "prisma migrate deploy",
+    "seed": "prisma db seed",
+    "build": "tsc -p tsconfig.json && node -e \"require('fs').cpSync('src/generated','dist/generated',{recursive:true,filter:s=>!s.endsWith('.ts')||s.endsWith('.d.ts')})\"",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "~7.10.1",
+    "@prisma/client": "~7.10.1",
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "dotenv": "^16.4.0",
+    "prisma": "~7.10.1",
+    "tsx": "^4.19.0",
+    "typescript": "^5.9.0",
+    "@types/node": "^22.10.0",
+    "@types/pg": "^8.11.0"
+  },
+  "types": "dist/index.d.ts"
+}
