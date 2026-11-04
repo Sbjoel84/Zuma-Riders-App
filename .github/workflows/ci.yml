@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: API — typecheck and tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: zuma
+          POSTGRES_PASSWORD: zuma
+          POSTGRES_DB: zuma_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U zuma" --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7
+        ports: ["6379:6379"]
+        options: --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://zuma:zuma@localhost:5432/zuma_test
+      DATABASE_URL: postgresql://zuma:zuma@localhost:5432/zuma_test
+      DIRECT_DATABASE_URL: postgresql://zuma:zuma@localhost:5432/zuma_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - name: Generate Prisma client and build shared packages
+        run: |
+          pnpm --filter @zuma/database generate
+          pnpm --filter @zuma/database build
+          pnpm --filter @zuma/contracts build
+      - name: Apply migrations
+        run: pnpm --filter @zuma/database migrate:deploy
+      - run: pnpm --filter @zuma/api typecheck
+      - run: pnpm --filter @zuma/api test
+
+  mobile:
+    name: Mobile apps — typecheck and bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @zuma/contracts build
+      - run: pnpm --filter @zuma/passenger typecheck
+      - run: pnpm --filter @zuma/driver typecheck
+      - name: Bundle both apps for Android and iOS
+        env: { CI: "1", EXPO_NO_TELEMETRY: "1" }
+        run: |
+          for app in passenger driver; do
+            (cd apps/$app && npx expo export --platform android --output-dir /tmp/export-$app-android && npx expo export --platform ios --output-dir /tmp/export-$app-ios)
+          done

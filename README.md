@@ -1,34 +1,116 @@
-# Ride-hailing platform (working name: `zuma`)
+# Zuma
 
-inDrive-style, fare-negotiation ride-hailing for Nigeria, launching in Abuja.
-Passenger app · Driver app · Admin dashboard · NestJS API — one backend, one PostgreSQL database.
+Fare-negotiation ride-hailing for Nigeria, launching in Abuja. The passenger offers a price, nearby drivers accept it or counter, and the passenger picks a driver.
 
-## Phase 1 status — Architecture & planning
-
-| Deliverable | Where | State |
+| App | Path | Stack |
 |---|---|---|
-| Architecture document | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Draft for review |
-| Decision records | [docs/DECISIONS.md](docs/DECISIONS.md) | 13 ADRs |
-| API contracts (REST + WebSocket) | [docs/API_CONTRACTS.md](docs/API_CONTRACTS.md) | Draft for review |
-| Development standards | [docs/STANDARDS.md](docs/STANDARDS.md) | Draft for review |
-| Prisma schema | [packages/database/prisma/schema.prisma](packages/database/prisma/schema.prisma) | 72 models, 45 enums; validates against Prisma 7.10 engine |
-| DB integrity SQL | [packages/database/prisma/sql/001_integrity.sql](packages/database/prisma/sql/001_integrity.sql) | Written; **not yet executed** against a live Postgres — first run is Phase 2 step 2 |
-| ER diagram | published separately (domain-split diagrams generated from the schema) | Done |
-| Directory structure | ARCHITECTURE §2 | Defined; scaffold in Phase 2 |
+| API (REST + Socket.IO + jobs) | `apps/api` | NestJS 11, Prisma 7, PostgreSQL + PostGIS, Redis, BullMQ |
+| Passenger app | `apps/passenger` | Expo SDK 58, Expo Router, React Native Maps |
+| Driver app | `apps/driver` | Expo SDK 58, background location |
+| Shared | `packages/contracts`, `packages/mobile-core`, `packages/database` | Zod contracts, API/socket client + UI kit, Prisma schema and migrations |
 
-## Decisions needed from the project owner
+## What works today (ride slice)
 
-1. **Brand name and domain** — needed for bundle IDs (`com.<brand>.passenger`/`.driver`), store listings and API/admin domains. `zuma` is a placeholder.
-2. **Commission rate(s)** at launch, per category, and whether cash trips carry the same rate.
-3. **Driver negative-balance limit** for unpaid cash commission before they're blocked from going online.
-4. **Motorcycle and tricycle categories in Abuja** — FCT has restricted commercial motorcycles/tricycles in parts of the city. Needs a legal check before enabling; the schema supports per-city, per-area category restrictions either way.
-5. **SMS/OTP provider** (proposal: Termii) and **masked calling** provider, or chat-only contact at launch.
-6. **Hosting** for API/realtime/worker (proposal: Railway or Fly.io) and Redis (Redis Cloud — needs keyspace notifications, so not a purely serverless Redis).
-7. **Payout timing** — how long earnings sit in *pending* before withdrawable (proposal: 24 h), minimum withdrawal, who pays transfer fees.
-8. **Wallet withdrawals for passengers** — allowed or refund-only? (Affects licensing posture: holding customer funds may raise CBN considerations; worth a legal opinion.)
-9. **Data retention periods** in ARCHITECTURE §7 — need NDPA/legal sign-off; appoint a DPO contact.
-10. **Emergency numbers & SOS procedure** per city, and whether an ops team will staff the safety queue 24/7 at launch.
+The full loop between the two apps and the API works:
 
-## Accounts/credentials to provision (Phase 2–6)
+1. **Sign in** with phone number and SMS code (refresh tokens rotate; a reused token signs the device out).
+2. **Driver onboarding:** licence details and vehicle, then approval.
+3. **Going online.** The driver app sends location in the background with a foreground-service notification on Android. If the heartbeat stops, the driver is taken offline.
+4. **Booking.** The passenger searches a destination and gets fares from versioned pricing rules for each service area. They offer their own price within the minimum and maximum, and pay by cash or wallet.
+5. **Negotiation.** The request goes to ranked nearby drivers, and the search radius widens if few respond. Drivers accept the price or counter-offer. The passenger compares live offers, raises the fare or cancels.
+6. **Acceptance** is atomic: one ride per request, one live ride per driver, and the fare is locked at the database level.
+7. **The trip:** en route → arrived (checked against distance from pickup) → start with the passenger's 4-digit PIN → complete. The passenger sees the driver move live on the map.
+8. **Settlement** goes through a double-entry ledger:
+   - Cash trips book the commission the driver owes.
+   - Wallet trips pay the driver into a pending balance, which is released after a 24-hour hold.
+9. **Ratings** both ways, and driver earnings for the day, week or month.
+10. **Admin API** for driver and vehicle approval, suspension, and the ride list with full negotiation history. There is no admin web dashboard yet.
 
-Neon (with PostGIS), Redis Cloud, hosting provider, Vercel, object storage (S3/R2), Google Maps Platform (Places, Routes, Geocoding, Maps SDK — billing enabled), Paystack + Flutterwave (test then live, business verification), SMS provider, Expo/EAS, Apple Developer Program, Google Play Console, Sentry, GitHub org/repo.
+**Not built yet:**
+- Admin dashboard (web)
+- Card payments and Paystack/Flutterwave wallet top-ups
+- Withdrawals
+- Document photo uploads
+- Push notifications
+- In-app chat
+- SOS alerts to emergency contacts and the ops team (the SOS screen only offers direct calls to 112 and 199, and says so)
+- Promo codes and referral rewards
+
+## Run it locally
+
+You need Node 22, pnpm 9 and Docker (or a local PostgreSQL 16 with PostGIS, plus Redis 7).
+
+```bash
+pnpm install
+docker compose up -d                      # Postgres+PostGIS on 5432, Redis on 6379
+
+cp packages/database/.env.example packages/database/.env   # point both URLs at localhost
+cp apps/api/.env.example apps/api/.env                     # then set the three secrets: openssl rand -hex 32
+pnpm --filter @zuma/database generate
+pnpm --filter @zuma/database build && pnpm --filter @zuma/contracts build
+pnpm db:migrate
+SEED_ADMIN_PHONE=+2348000000001 pnpm db:seed               # Abuja, categories, pricing v1, roles, an admin
+
+pnpm api:dev                              # http://localhost:4000, OTP codes print in this terminal
+```
+
+In development the API uses `SMS_PROVIDER=console`, so sign-in codes are printed in the API terminal. It also uses `MAPS_PROVIDER=estimate`: a list of Abuja places for search and straight-line × 1.35 for distances. The API refuses both settings when `NODE_ENV=production`.
+
+### Run the apps on a phone
+
+The apps use native modules (maps, background location, secure storage), so they need a development build, not Expo Go.
+
+```bash
+cd apps/passenger && cp .env.example .env    # EXPO_PUBLIC_API_URL=http://<your-computer's-LAN-IP>:4000
+npx expo run:android                          # or: npx eas build --profile development --platform android
+# same for apps/driver
+```
+
+To test a full trip with one computer and two phones (or one phone and an emulator):
+
+1. Driver app: sign in, complete the details and vehicle steps.
+2. `pnpm approve-driver 0803 123 4567` (the driver's number). This is a development-only stand-in for the admin dashboard.
+3. Driver app: **Go online** from somewhere inside Abuja. In an emulator, set the GPS location to Wuse 2 (9.0765, 7.4790).
+4. Passenger app: sign in, search "Jabi" or "Airport", pick a fare and tap **Find drivers**.
+5. Driver: accept or counter. Passenger: accept the offer, read out the PIN. Driver: arrived → enter PIN → complete.
+
+## Tests
+
+```bash
+pnpm api:test        # 24 tests against real Postgres+PostGIS and Redis (uses the zuma_test database)
+```
+
+The tests cover:
+- the trip state machine, for every state, event and actor;
+- fare bounds and rounding, commission and phone normalisation;
+- the brief's 20-step journey end to end over REST and Socket.IO;
+- 10 concurrent accepts producing exactly one ride, and two passengers accepting the same driver at the same moment;
+- duplicate submits, refresh-token reuse, request expiry, and unverified drivers being blocked;
+- wallet settlement and the pending → available release;
+- place search.
+
+CI (`.github/workflows/ci.yml`) runs the API tests with PostGIS and Redis service containers, and typechecks and bundles both apps for Android and iOS.
+
+## Docs
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): system design, ride lifecycle, matching, money, security
+- [docs/DECISIONS.md](docs/DECISIONS.md): architecture decision records
+- [docs/API_CONTRACTS.md](docs/API_CONTRACTS.md): REST and WebSocket contracts (the full target API; the ride slice implements the auth, driver, ride, wallet-read and admin-driver parts)
+- [docs/STANDARDS.md](docs/STANDARDS.md): coding, testing and done criteria
+
+## Decisions needed from the owner
+
+1. Brand name and domain (bundle IDs are `com.zuma.passenger` / `com.zuma.driver` for now).
+2. Commission rate per category (seeded at 15%), and whether cash trips use the same rate.
+3. How much cash commission a driver may owe before being blocked from going online (₦5,000 for now).
+4. Motorcycle and tricycle categories in the FCT: they are off pending a legal review.
+5. SMS provider (Termii is wired in) and whether to mask phone calls between rider and driver.
+6. Hosting for the API (Railway or Fly.io) and Redis (needs keyspace notifications).
+7. Payout hold time (24 h now), minimum withdrawal, and who pays transfer fees.
+8. Whether passengers can withdraw wallet balances (affects the licensing position with the CBN).
+9. Data retention periods and DPO contact, for NDPA compliance.
+10. SOS procedure, and whether ops staff the safety queue 24/7 at launch.
+
+## Accounts and keys needed next
+
+Neon (PostGIS enabled), Redis Cloud, API hosting, Google Maps Platform (Places, Routes, Geocoding, and the Maps SDK for Android/iOS), Termii, Expo/EAS, Apple Developer Program, Google Play Console, Paystack and Flutterwave (test keys first), Sentry, and object storage for documents.

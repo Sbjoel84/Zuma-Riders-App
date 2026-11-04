@@ -34,8 +34,7 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "typecheck": "tsc --noEmit",
-    "export:android": "expo export --platform android --output-dir dist-check"
+    "typecheck": "tsc --noEmit"
   },
   "private": true
 }

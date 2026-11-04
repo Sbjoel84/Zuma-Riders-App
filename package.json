@@ -2,13 +2,25 @@
   "name": "zuma",
   "private": true,
   "packageManager": "pnpm@9.15.0",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "db:validate": "pnpm --filter @zuma/database validate"
+    "db:validate": "pnpm --filter @zuma/database validate",
+    "db:migrate": "pnpm --filter @zuma/database migrate:deploy",
+    "db:seed": "pnpm --filter @zuma/database seed",
+    "api:dev": "pnpm --filter @zuma/api dev",
+    "api:test": "pnpm --filter @zuma/api test",
+    "passenger": "pnpm --filter @zuma/passenger start",
+    "driver": "pnpm --filter @zuma/driver start",
+    "approve-driver": "pnpm --filter @zuma/api approve-driver"
   },
-  "devDependencies": { "turbo": "^2.3.0", "typescript": "^5.7.0" }
+  "devDependencies": {
+    "turbo": "^2.3.0",
+    "typescript": "^5.7.0"
+  }
 }
