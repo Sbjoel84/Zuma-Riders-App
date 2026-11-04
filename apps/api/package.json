@@ -8,7 +8,8 @@
     "start": "node dist/main.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "jest --runInBand",
-    "approve-driver": "tsx scripts/approve-driver.ts"
+    "approve-driver": "tsx scripts/approve-driver.ts",
+    "demo-data": "tsc -p tsconfig.scripts.json && node dist-scripts/scripts/demo-data.js"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.0",

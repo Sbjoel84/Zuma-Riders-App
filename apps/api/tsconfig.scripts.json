@@ -1,0 +1,1 @@
+{ "extends": "./tsconfig.json", "compilerOptions": { "outDir": "dist-scripts", "rootDir": ".", "types": ["node"], "sourceMap": false }, "include": ["src", "scripts/demo-data.ts"] }

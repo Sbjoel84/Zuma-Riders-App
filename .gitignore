@@ -11,3 +11,7 @@ dist-check
 .expo
 android
 ios
+dist-scripts
+dump.rdb
+*.local
+apps/admin/dist
