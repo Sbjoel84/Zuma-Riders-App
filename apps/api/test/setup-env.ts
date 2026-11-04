@@ -10,3 +10,5 @@ process.env.MAPS_PROVIDER = "estimate";
 process.env.WORKER_ENABLED = "true";
 process.env.MATCH_EXPAND_AFTER_S = "1";
 process.env.EARNINGS_HOLD_S = "1";
+process.env.OTP_LIMIT_PER_IP_HOUR = "1000";
+process.env.OTP_LIMIT_PER_PHONE_10MIN = "20";

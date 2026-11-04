@@ -1,14 +1,23 @@
 import { Body, Controller, Get, HttpCode, Param, Post, Put, Query } from "@nestjs/common";
+import { kobo } from "@zuma/contracts";
 import { DriverOnboardBody, GoOnlineBody, LocationPoint, VehicleBody } from "@zuma/contracts";
 import { z } from "zod";
 import { fail } from "../../common/errors";
-import { Auth, type AuthContext, ZodPipe } from "../../common/http";
+import { Auth, type AuthContext, IdempotencyKey, ZodPipe } from "../../common/http";
 import { PrismaService } from "../../infra/prisma.service";
 import { Scopes } from "../auth/auth.guard";
 import { AvailabilityService } from "../geo/availability.service";
 import { WalletService } from "../ledger/wallet.service";
+import { WithdrawalsService } from "../ledger/withdrawals.service";
 import { TripsService } from "../rides/trips.service";
 import { DriversService } from "./drivers.service";
+
+const BankBody = z.object({
+  bankName: z.string().trim().min(2).max(60),
+  accountName: z.string().trim().min(3).max(100),
+  accountNumber: z.string().regex(/^\d{10}$/, "NUBAN account numbers have 10 digits"),
+});
+const WithdrawBody = z.object({ amount: kobo });
 
 @Scopes("DRIVER")
 @Controller("v1/driver")
@@ -19,6 +28,7 @@ export class DriversController {
     private readonly wallets: WalletService,
     private readonly trips: TripsService,
     private readonly prisma: PrismaService,
+    private readonly withdrawals: WithdrawalsService,
   ) {}
 
   private async driverId(userId: string) {
@@ -75,6 +85,34 @@ export class DriversController {
   @Get("wallet")
   wallet(@Auth() auth: AuthContext) {
     return this.wallets.view(auth.userId, "DRIVER");
+  }
+
+  /**
+   * Bank details for manual payouts. Only the bank, account name and last four digits are kept;
+   * the full number is needed once to set up a provider transfer recipient (payments phase).
+   */
+  @Put("bank-account")
+  async bank(@Auth() auth: AuthContext, @Body(new ZodPipe(BankBody)) body: z.infer<typeof BankBody>) {
+    const id = await this.driverId(auth.userId);
+    await this.prisma.db.driver.update({ where: { id }, data: { bankName: body.bankName, bankAccountName: body.accountName, bankAccountLast4: body.accountNumber.slice(-4) } });
+    return { bankName: body.bankName, accountName: body.accountName, last4: body.accountNumber.slice(-4) };
+  }
+
+  @Get("bank-account")
+  async getBank(@Auth() auth: AuthContext) {
+    const d = await this.prisma.db.driver.findUnique({ where: { userId: auth.userId } });
+    return d?.bankAccountLast4 ? { bankName: d.bankName, accountName: d.bankAccountName, last4: d.bankAccountLast4 } : null;
+  }
+
+  @Post("withdrawals")
+  async withdraw(@Auth() auth: AuthContext, @Body(new ZodPipe(WithdrawBody)) body: { amount: string }, @IdempotencyKey() key: string) {
+    const w = await this.withdrawals.request(auth.userId, BigInt(body.amount), key);
+    return { id: w.id, amount: w.amount.toString(), status: w.status };
+  }
+
+  @Get("withdrawals")
+  listWithdrawals(@Auth() auth: AuthContext) {
+    return this.withdrawals.list(auth.userId);
   }
 
   @Get("wallet/transactions")

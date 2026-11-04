@@ -135,9 +135,9 @@ describe("full ride journey", () => {
     // 20. Admin sees the trip, its money and the negotiation history
     const A = t.api(admin.accessToken);
     const rides = await A.get("/v1/admin/rides").expect(200);
-    const r = rides.body.find((x: { id: string }) => x.id === rideId);
+    const r = rides.body.data.find((x: { id: string }) => x.id === rideId);
     expect(r).toMatchObject({ status: "TRIP_COMPLETED", proposedFare: proposed, agreedFare: counter, commission: commission.toString(), paymentMethod: "CASH" });
-    const neg = await A.get(`/v1/admin/rides/${rideId}/negotiation`).expect(200);
+    const neg = await A.get(`/v1/admin/rides/${rideId}`).expect(200);
     expect(neg.body.negotiation.map((e: { action: string }) => e.action)).toEqual(["PASSENGER_PROPOSED", "DRIVER_COUNTER_OFFER", "PASSENGER_ACCEPTED_OFFER"]);
     expect(neg.body.statusHistory.map((h: { to: string }) => h.to)).toEqual(["DRIVER_SELECTED", "DRIVER_EN_ROUTE", "DRIVER_ARRIVED", "TRIP_STARTED", "TRIP_COMPLETED"]);
 

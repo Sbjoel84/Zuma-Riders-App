@@ -28,6 +28,7 @@ export class NegotiationService {
     const p = await this.prisma.db.passengerProfile.findUnique({ where: { userId }, include: { user: true } });
     if (!p) fail("FORBIDDEN", "Open the passenger app to create a passenger account");
     if (!p!.user.firstName) fail("PROFILE_INCOMPLETE", "Add your name before booking");
+    if (p!.user.status !== "ACTIVE") fail("FORBIDDEN", "Your account is suspended. Contact support.");
     return p!;
   }
 

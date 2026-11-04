@@ -31,6 +31,8 @@ const schema = z
     DRIVER_NEGATIVE_LIMIT_KOBO: z.coerce.bigint().default(500000n),
     ARRIVAL_RADIUS_M: z.coerce.number().default(300),
     CORS_ORIGINS: z.string().default("*"),
+    OTP_LIMIT_PER_PHONE_10MIN: z.coerce.number().default(3),
+    OTP_LIMIT_PER_IP_HOUR: z.coerce.number().default(20),
   })
   .superRefine((e, ctx) => {
     if (e.NODE_ENV === "production") {

@@ -5,7 +5,14 @@ import { MapsService } from "./infra/maps.service";
 import { PrismaService } from "./infra/prisma.service";
 import { RedisService } from "./infra/redis.service";
 import { SmsService } from "./infra/sms.service";
-import { AdminController } from "./modules/admin/admin.controller";
+import { AdminConfigController } from "./modules/admin/admin-config.controller";
+import { AdminFinanceController } from "./modules/admin/admin-finance.controller";
+import { AdminOpsController } from "./modules/admin/admin-ops.controller";
+import { AdminPeopleController } from "./modules/admin/admin-people.controller";
+import { AdminContext } from "./modules/admin/admin.support";
+import { WithdrawalsService } from "./modules/ledger/withdrawals.service";
+import { AdminSafetyController, SafetyController } from "./modules/support/safety.controller";
+import { AdminSupportController, SupportController } from "./modules/support/support.controller";
 import { AuthController } from "./modules/auth/auth.controller";
 import { AuthGuard, Public } from "./modules/auth/auth.guard";
 import { AuthService } from "./modules/auth/auth.service";
@@ -54,11 +61,12 @@ class HealthController {
  * will be split into feature modules as the remaining phases land.
  */
 @Module({
-  controllers: [HealthController, AuthController, MapsController, UsersController, DriversController, RidesController, AdminController],
+  controllers: [HealthController, AuthController, MapsController, UsersController, DriversController, RidesController, SupportController, SafetyController,
+    AdminOpsController, AdminPeopleController, AdminFinanceController, AdminConfigController, AdminSupportController, AdminSafetyController],
   providers: [
     PrismaService, RedisService, SmsService, MapsService,
     TokensService, AuthService,
-    WalletService, LedgerService,
+    WalletService, LedgerService, WithdrawalsService, AdminContext,
     EventsService, RealtimeGateway,
     AvailabilityService, PricingService,
     JobsService, MatchingService, SettlementService, NegotiationService, TripsService,

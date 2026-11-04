@@ -205,3 +205,15 @@ describe("negotiation edge cases", () => {
     expect(txns.body.data[0]).toMatchObject({ direction: "CREDIT", amount: (fare - commission).toString() });
   });
 });
+
+describe("sign-in rate limits", () => {
+  const t = new TestApp();
+  beforeAll(() => t.start());
+  afterAll(() => t.stop());
+  it("refuses more than the per-phone limit of code requests", async () => {
+    const limit = Number(process.env.OTP_LIMIT_PER_PHONE_10MIN);
+    for (let i = 0; i < limit; i++) await t.http().post("/v1/auth/otp/request").send({ phone: "08079999999", appScope: "PASSENGER" }).expect(200);
+    const r = await t.http().post("/v1/auth/otp/request").send({ phone: "08079999999", appScope: "PASSENGER" }).expect(429);
+    expect(r.body.error.code).toBe("RATE_LIMITED");
+  });
+});

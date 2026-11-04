@@ -38,8 +38,8 @@ export class AuthService {
 
   async requestOtp(body: OtpRequestBody, ip: string) {
     const phone = normalizeNigerianPhone(body.phone) ?? fail("VALIDATION_FAILED", "Enter a valid phone number, e.g. 0803 123 4567");
-    await this.rateLimit(`rl:otp:phone:${phone}`, 3, 600);
-    await this.rateLimit(`rl:otp:ip:${ip}`, 20, 3600);
+    await this.rateLimit(`rl:otp:phone:${phone}`, env().OTP_LIMIT_PER_PHONE_10MIN, 600);
+    await this.rateLimit(`rl:otp:ip:${ip}`, env().OTP_LIMIT_PER_IP_HOUR, 3600);
 
     if (body.appScope === "ADMIN") {
       const admin = await this.prisma.db.user.findFirst({ where: { phoneE164: phone, adminProfile: { isNot: null } } });
