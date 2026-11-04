@@ -21,7 +21,7 @@ export function LiveMap() {
 
   const cats = useMemo(() => {
     const s = new Set((q.data?.drivers ?? []).map((d) => d.category).filter(Boolean) as string[]);
-    return [{ value: "all", label: "All", count: q.data?.drivers.length }, ...[...s].map((c) => ({ value: c, label: c[0]!.toUpperCase() + c.slice(1), count: q.data?.drivers.filter((d) => d.category === c).length }))];
+    return [{ value: "all", label: "All", count: q.data?.drivers.length }, ...[...s].map((c) => ({ value: c, label: c === "suv" ? "SUV" : c[0]!.toUpperCase() + c.slice(1), count: q.data?.drivers.filter((d) => d.category === c).length }))];
   }, [q.data]);
 
   return (

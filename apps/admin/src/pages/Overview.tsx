@@ -68,7 +68,7 @@ export function Overview() {
                           <XAxis dataKey="hour" tickFormatter={(h) => `${String(h).padStart(2, "0")}`} tick={{ fontSize: 11, fill: "#5d645c" }} axisLine={false} tickLine={false} interval={2} />
                           <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#5d645c" }} axisLine={false} tickLine={false} />
                           <Tooltip cursor={{ fill: "#f4f5f1" }} formatter={(v) => [`${v} rides`, ""]} labelFormatter={(h) => `${String(h).padStart(2, "0")}:00`} />
-                          <Bar dataKey="rides" radius={[4, 4, 0, 0]}>
+                          <Bar dataKey="rides" radius={[4, 4, 0, 0]} isAnimationActive={false}>
                             {o.byHour.map((h) => <Cell key={h.hour} fill={h.rides === peak ? "#f2a900" : "#12161b"} />)}
                           </Bar>
                         </BarChart>

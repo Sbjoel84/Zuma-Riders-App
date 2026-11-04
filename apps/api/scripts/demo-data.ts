@@ -250,7 +250,13 @@ async function main() {
     console.log(`Keeping demo drivers online for ${keepMinutes} minutes (Ctrl+C to stop)…`);
     const end = Date.now() + keepMinutes * 60_000;
     let seq = 5_000_000;
+    let lastLogin = Date.now();
     while (Date.now() < end) {
+      // Access tokens last 15 minutes: sign the demo drivers in again every 10.
+      if (Date.now() - lastLogin > 10 * 60_000) {
+        for (const d of Object.values(drivers)) d.api = as(await login(d.spec.phone, "DRIVER"));
+        lastLogin = Date.now();
+      }
       for (const [name, d] of Object.entries(drivers)) {
         const jitter = (Math.random() - 0.5) * 0.004;
         d.pos = { lat: d.pos.lat + jitter / 4, lng: d.pos.lng + jitter / 4 };
