@@ -13,6 +13,7 @@ import { TokensService } from "./modules/auth/tokens.service";
 import { DriversController } from "./modules/drivers/drivers.controller";
 import { DriversService } from "./modules/drivers/drivers.service";
 import { AvailabilityService } from "./modules/geo/availability.service";
+import { MapsController } from "./modules/geo/maps.controller";
 import { LedgerService } from "./modules/ledger/ledger.service";
 import { WalletService } from "./modules/ledger/wallet.service";
 import { PricingService } from "./modules/pricing/pricing.service";
@@ -53,7 +54,7 @@ class HealthController {
  * will be split into feature modules as the remaining phases land.
  */
 @Module({
-  controllers: [HealthController, AuthController, UsersController, DriversController, RidesController, AdminController],
+  controllers: [HealthController, AuthController, MapsController, UsersController, DriversController, RidesController, AdminController],
   providers: [
     PrismaService, RedisService, SmsService, MapsService,
     TokensService, AuthService,
