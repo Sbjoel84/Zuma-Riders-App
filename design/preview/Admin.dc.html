@@ -1,0 +1,1230 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Operations console</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&amp;family=Figtree:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#12161b}a:hover{color:#000}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid #f2a900;outline-offset:2px}
+</style>
+</helmet>
+<div style="box-sizing: border-box; min-height: 1040px; background: #f4f5f1; font-family: Figtree, 'Segoe UI', system-ui, sans-serif; color: #12161b; display: flex; flex-wrap: wrap; align-items: stretch">
+
+  <nav aria-label="Admin sections" style="flex: 1 1 220px; max-width: 100%; box-sizing: border-box; background: #12161b; color: #f1f3ee; padding: 24px 16px; display: flex; flex-direction: column; gap: 20px">
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
+      <span style="font-family: 'Familjen Grotesk', Figtree, sans-serif; font-weight: 700; font-size: 22px">zuma</span>
+      <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #12161b; background: #f2a900; padding: 3px 8px; border-radius: 6px">Ops</span>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 2px">
+      <sc-for list="{{nav}}" as="n" hint-placeholder-count="11">
+        <button onClick="{{n.go}}" aria-current="{{n.current}}" style="{{n.style}}">
+          <span>{{n.label}}</span>
+          <sc-if value="{{n.badge}}" hint-placeholder-val="{{ false }}">
+            <span style="{{n.badgeStyle}}">{{n.badge}}</span>
+          </sc-if>
+        </button>
+      </sc-for>
+    </div>
+    <div style="margin-top: auto; font-size: 12px; color: #a9b0a8; line-height: 1.5">Signed in as Ops Lead · Abuja<br>2FA verified</div>
+  </nav>
+
+  <main style="flex: 999 1 640px; min-width: 0; box-sizing: border-box; padding: 28px clamp(16px, 3vw, 40px) 40px; display: flex; flex-direction: column; gap: 24px">
+
+    <header style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px">
+      <div style="min-width: 0">
+        <div style="font-size: 13px; color: #5d645c">Abuja · Sunday 1 November · sample data</div>
+        <h1 style="margin: 0; font-family: 'Familjen Grotesk', Figtree, sans-serif; font-size: 32px; font-weight: 700">{{title}}</h1>
+        <div style="font-size: 14px; color: #5d645c; margin-top: 2px">{{subtitle}}</div>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px">
+        <label for="city" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">City</label>
+        <select id="city" style="height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid #d6d9d2; background: #ffffff; font: 600 14px Figtree, sans-serif; color: #12161b">
+          <option>Abuja</option><option>Lagos (not live)</option>
+        </select>
+        <button onClick="{{exportCsv}}" style="height: 40px; padding: 0 14px; border-radius: 10px; border: 1px solid #12161b; background: #ffffff; font: 600 14px Figtree, sans-serif; color: #12161b; cursor: pointer">Export CSV</button>
+      </div>
+    </header>
+
+    <sc-if value="{{toast}}" hint-placeholder-val="{{ false }}">
+      <div role="status" style="display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: 12px; background: #12161b; color: #ffffff; font-size: 14px; font-weight: 600">
+        <span style="width: 8px; height: 8px; border-radius: 4px; background: #f2a900; flex: none"></span>
+        <span style="flex: 1; min-width: 0">{{toast}}</span>
+        <button onClick="{{dismissToast}}" aria-label="Dismiss" style="border: 0; background: transparent; color: #c9cec7; font: 600 13px Figtree, sans-serif; cursor: pointer">Dismiss</button>
+      </div>
+    </sc-if>
+
+    <!-- ============ OVERVIEW ============ -->
+    <sc-if value="{{v.overview}}" hint-placeholder-val="{{ true }}">
+      <div style="display: flex; flex-direction: column; gap: 20px">
+        <section aria-label="Key figures" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px">
+          <sc-for list="{{kpis}}" as="k" hint-placeholder-count="6">
+            <div style="background: #ffffff; border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 6px; border: 1px solid #e6e8e3">
+              <span style="font-size: 13px; color: #5d645c; font-weight: 500">{{k.label}}</span>
+              <span style="font-family: 'Familjen Grotesk', Figtree, sans-serif; font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1">{{k.value}}</span>
+              <span style="{{k.deltaStyle}}">{{k.delta}}</span>
+            </div>
+          </sc-for>
+        </section>
+        <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: stretch">
+          <section aria-label="Bookings by hour" style="flex: 3 1 420px; min-width: 0; background: #ffffff; border-radius: 14px; padding: 18px; border: 1px solid #e6e8e3; display: flex; flex-direction: column; gap: 14px">
+            <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px">
+              <h2 style="margin: 0; font-size: 16px; font-weight: 700">Bookings by hour</h2>
+              <span style="font-size: 12px; color: #5d645c">Completed rides, today</span>
+            </div>
+            <div style="display: flex; align-items: flex-end; gap: 4px; height: 180px; border-bottom: 1px solid #d6d9d2" role="img" aria-label="Bar chart of completed rides per hour, peaking at 8am and 6pm">
+              <sc-for list="{{hours}}" as="h" hint-placeholder-count="18">
+                <div style="{{h.style}}" title="{{h.tip}}"></div>
+              </sc-for>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 11px; color: #5d645c; font-variant-numeric: tabular-nums">
+              <span>05:00</span><span>09:00</span><span>13:00</span><span>17:00</span><span>22:00</span>
+            </div>
+          </section>
+          <section aria-label="Needs attention" style="flex: 2 1 300px; min-width: 0; background: #ffffff; border-radius: 14px; padding: 18px; border: 1px solid #e6e8e3; display: flex; flex-direction: column; gap: 10px">
+            <h2 style="margin: 0; font-size: 16px; font-weight: 700">Needs attention</h2>
+            <sc-for list="{{alerts}}" as="a" hint-placeholder-count="4">
+              <button onClick="{{a.go}}" style="display: flex; gap: 12px; align-items: flex-start; text-align: left; border: 0; cursor: pointer; color: #12161b; padding: 10px; border-radius: 10px; background: #f8f9f6; font-family: Figtree, sans-serif">
+                <span style="{{a.dotStyle}}" aria-hidden="true"></span>
+                <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+                  <span style="font-weight: 600; font-size: 14px">{{a.title}}</span>
+                  <span style="font-size: 12px; color: #5d645c">{{a.detail}}</span>
+                </span>
+                <span style="font-size: 12px; font-weight: 600; color: #5d645c">Open</span>
+              </button>
+            </sc-for>
+          </section>
+        </div>
+        <section aria-label="Recent rides" style="background: #ffffff; border-radius: 14px; border: 1px solid #e6e8e3; display: flex; flex-direction: column">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; padding: 18px 18px 10px; flex-wrap: wrap; gap: 8px">
+            <h2 style="margin: 0; font-size: 16px; font-weight: 700">Recent rides</h2>
+            <button onClick="{{goRides}}" style="border: 0; background: transparent; font: 600 13px Figtree, sans-serif; color: #12161b; text-decoration: underline; cursor: pointer">View all rides</button>
+          </div>
+          <div style="overflow-x: auto">
+            <table style="width: 100%; min-width: 760px; border-collapse: collapse; font-size: 14px">
+              <thead>
+                <tr style="text-align: left; color: #5d645c; font-size: 12px">
+                  <th style="padding: 10px 18px; font-weight: 600">Ride</th>
+                  <th style="padding: 10px 12px; font-weight: 600">Passenger</th>
+                  <th style="padding: 10px 12px; font-weight: 600">Driver</th>
+                  <th style="padding: 10px 12px; font-weight: 600">Route</th>
+                  <th style="padding: 10px 12px; font-weight: 600; text-align: right">Proposed → agreed</th>
+                  <th style="padding: 10px 18px; font-weight: 600">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <sc-for list="{{recentRides}}" as="r" hint-placeholder-count="6">
+                  <tr style="border-top: 1px solid #eceee9">
+                    <td style="padding: 8px 18px"><button onClick="{{r.open}}" style="border: 0; background: transparent; padding: 4px 0; font: 700 14px Figtree, sans-serif; color: #12161b; text-decoration: underline; cursor: pointer; font-variant-numeric: tabular-nums">{{r.code}}</button></td>
+                    <td style="padding: 8px 12px">{{r.passenger}}</td>
+                    <td style="padding: 8px 12px">{{r.driver}}</td>
+                    <td style="padding: 8px 12px; color: #3d443c">{{r.route}}</td>
+                    <td style="padding: 8px 12px; text-align: right; font-variant-numeric: tabular-nums">{{r.fares}}</td>
+                    <td style="padding: 8px 18px"><span style="{{r.pillStyle}}">{{r.status}}</span></td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </sc-if>
+
+    <!-- ============ LIVE MAP ============ -->
+    <sc-if value="{{v.map}}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start">
+        <section aria-label="Live map" style="flex: 3 1 480px; min-width: 0; background: #ffffff; border-radius: 14px; border: 1px solid #e6e8e3; padding: 14px; display: flex; flex-direction: column; gap: 12px">
+          <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between">
+            <div style="display: flex; flex-wrap: wrap; gap: 6px" role="radiogroup" aria-label="Filter by category">
+              <sc-for list="{{mapCats}}" as="c" hint-placeholder-count="5">
+                <button role="radio" aria-checked="{{c.checked}}" onClick="{{c.pick}}" style="{{c.style}}">{{c.label}}</button>
+              </sc-for>
+            </div>
+            <div style="display: flex; gap: 14px; font-size: 12px; color: #5d645c">
+              <span style="display: flex; gap: 6px; align-items: center"><span style="width: 10px; height: 10px; border-radius: 5px; background: #1f7a4f"></span>Free</span>
+              <span style="display: flex; gap: 6px; align-items: center"><span style="width: 10px; height: 10px; border-radius: 5px; background: #f2a900; border: 1px solid #12161b; box-sizing: border-box"></span>On trip</span>
+              <span style="display: flex; gap: 6px; align-items: center"><span style="width: 10px; height: 10px; border-radius: 5px; background: #b3261e"></span>SOS</span>
+            </div>
+          </div>
+          <div style="position: relative; width: 100%; aspect-ratio: 5 / 3; max-width: 100%; border-radius: 10px; overflow: hidden; background: #e6e9e2">
+            <svg viewBox="0 0 500 300" preserveAspectRatio="none" aria-hidden="true" style="position: absolute; inset: 0; width: 100%; height: 100%; display: block">
+              <rect width="500" height="300" fill="#e6e9e2"></rect>
+              <path d="M0 80 L500 120" stroke="#ffffff" stroke-width="9"></path>
+              <path d="M0 210 L500 170" stroke="#ffffff" stroke-width="12"></path>
+              <path d="M120 0 L160 300" stroke="#ffffff" stroke-width="7"></path>
+              <path d="M330 0 L360 300" stroke="#ffffff" stroke-width="9"></path>
+              <path d="M0 290 Q 250 240 500 280" stroke="#ffffff" stroke-width="6" fill="none"></path>
+              <path d="M40 20 L230 140 L470 40" stroke="#d6d9d2" stroke-width="2" fill="none" stroke-dasharray="6 6"></path>
+              <rect x="200" y="130" width="70" height="40" rx="6" fill="#d3e2cf"></rect>
+              <text x="12" y="24" font-size="11" fill="#5d645c" font-family="Figtree, sans-serif">Kubwa</text>
+              <text x="210" y="124" font-size="11" fill="#5d645c" font-family="Figtree, sans-serif">Central Area</text>
+              <text x="380" y="70" font-size="11" fill="#5d645c" font-family="Figtree, sans-serif">Maitama</text>
+              <text x="60" y="250" font-size="11" fill="#5d645c" font-family="Figtree, sans-serif">Lugbe</text>
+              <text x="380" y="230" font-size="11" fill="#5d645c" font-family="Figtree, sans-serif">Asokoro</text>
+            </svg>
+            <sc-for list="{{mapDots}}" as="d" hint-placeholder-count="20">
+              <span title="{{d.tip}}" style="{{d.style}}"></span>
+            </sc-for>
+          </div>
+          <div style="font-size: 12px; color: #5d645c">Showing {{mapCount}} drivers · positions refresh every 5 seconds</div>
+        </section>
+        <section aria-label="Active trips" style="flex: 2 1 300px; min-width: 0; background: #ffffff; border-radius: 14px; border: 1px solid #e6e8e3; padding: 18px; display: flex; flex-direction: column; gap: 10px">
+          <h2 style="margin: 0; font-size: 16px; font-weight: 700">Active trips</h2>
+          <sc-for list="{{activeRides}}" as="r" hint-placeholder-count="4">
+            <button onClick="{{r.open}}" style="display: flex; justify-content: space-between; gap: 10px; align-items: center; text-align: left; border: 1px solid #eceee9; background: #ffffff; border-radius: 10px; padding: 10px 12px; cursor: pointer; font-family: Figtree, sans-serif; color: #12161b">
+              <span style="min-width: 0">
+                <span style="display: block; font-weight: 700; font-size: 14px">{{r.code}} · {{r.route}}</span>
+                <span style="display: block; font-size: 12px; color: #5d645c">{{r.driver}} · {{r.agreed}}</span>
+              </span>
+              <span style="{{r.pillStyle}}">{{r.status}}</span>
+            </button>
+          </sc-for>
+        </section>
+      </div>
+    </sc-if>
+
+    <!-- ============ RIDES ============ -->
+    <sc-if value="{{v.rides}}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; flex-wrap: wrap; gap: 6px" role="tablist" aria-label="Ride status">
+          <sc-for list="{{rideTabs}}" as="t" hint-placeholder-count="5">
+            <button role="tab" aria-selected="{{t.checked}}" onClick="{{t.pick}}" style="{{t.style}}">{{t.label}} <span style="opacity: 0.7">{{t.count}}</span></button>
+          </sc-for>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start">
+          <section aria-label="Ride list" style="flex: 3 1 460px; min-width: 0; background: #ffffff; border-radius: 14px; border: 1px solid #e6e8e3; overflow: hidden">
+            <div style="overflow-x: auto">
+              <table style="width: 100%; min-width: 620px; border-collapse: collapse; font-size: 14px">
+                <thead>
+                  <tr style="text-align: left; color: #5d645c; font-size: 12px; background: #f8f9f6">
+                    <th style="padding: 10px 14px; font-weight: 600">Ride</th>
+                    <th style="padding: 10px 10px; font-weight: 600">Route</th>
+                    <th style="padding: 10px 10px; font-weight: 600; text-align: right">Agreed</th>
+                    <th style="padding: 10px 10px; font-weight: 600">Pay</th>
+                    <th style="padding: 10px 14px; font-weight: 600">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <sc-for list="{{rideRows}}" as="r" hint-placeholder-count="8">
+                    <tr style="{{r.rowStyle}}">
+                      <td style="padding: 8px 14px"><button onClick="{{r.open}}" style="border: 0; background: transparent; padding: 4px 0; font: 700 14px Figtree, sans-serif; color: #12161b; text-decoration: underline; cursor: pointer">{{r.code}}</button></td>
+                      <td style="padding: 8px 10px; color: #3d443c">{{r.route}}</td>
+                      <td style="padding: 8px 10px; text-align: right; font-variant-numeric: tabular-nums">{{r.agreed}}</td>
+                      <td style="padding: 8px 10px">{{r.payment}}</td>
+                      <td style="padding: 8px 14px"><span style="{{r.pillStyle}}">{{r.status}}</span></td>
+                    </tr>
+                  </sc-for>
+                </tbody>
+              </table>
+            </div>
+          </section>
+          <section aria-label="Ride detail" style="flex: 2 1 320px; min-width: 0; background: #ffffff; border-radius: 14px; border: 1px solid #e6e8e3; padding: 18px; display: flex; flex-direction: column; gap: 14px">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px">
+              <h2 style="margin: 0; font-size: 18px; font-weight: 700">{{ride.code}}</h2>
+              <span style="{{ride.pillStyle}}">{{ride.status}}</span>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; font-size: 13px">
+              <div><div style="color: #5d645c">Passenger</div><div style="font-weight: 600">{{ride.passenger}}</div></div>
+              <div><div style="color: #5d645c">Driver</div><div style="font-weight: 600">{{ride.driver}}</div></div>
+              <div><div style="color: #5d645c">Route</div><div style="font-weight: 600">{{ride.route}}</div></div>
+              <div><div style="color: #5d645c">Distance</div><div style="font-weight: 600">{{ride.distance}}</div></div>
+              <div><div style="color: #5d645c">Fare</div><div style="font-weight: 600">{{ride.fares}}</div></div>
+              <div><div style="color: #5d645c">Payment</div><div style="font-weight: 600">{{ride.payment}}</div></div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px">
+              <h3 style="margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #5d645c">Negotiation</h3>
+              <sc-for list="{{ride.neg}}" as="e" hint-placeholder-count="4">
+                <div style="display: flex; gap: 10px; font-size: 13px">
+                  <span style="width: 44px; flex: none; color: #5d645c; font-variant-numeric: tabular-nums">{{e.t}}</span>
+                  <span style="flex: 1; min-width: 0">{{e.text}}</span>
+                </div>
+              </sc-for>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px">
+              <h3 style="margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #5d645c">Status history</h3>
+              <sc-for list="{{ride.hist}}" as="e" hint-placeholder-count="4">
+                <div style="display: flex; gap: 10px; font-size: 13px">
+                  <span style="width: 44px; flex: none; color: #5d645c; font-variant-numeric: tabular-nums">{{e.t}}</span>
+                  <span style="flex: 1; min-width: 0">{{e.text}}</span>
+                </div>
+              </sc-for>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px; padding-top: 4px; border-top: 1px solid #eceee9">
+              <button onClick="{{ride.message}}" style="height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid #d6d9d2; background: #ffffff; font: 600 13px Figtree, sans-serif; color: #12161b; cursor: pointer">Message parties</button>
+              <sc-if value="{{ride.canDispute}}" hint-placeholder-val="{{ false }}">
+                <button onClick="{{ride.dispute}}" style="height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid #d6d9d2; background: #ffffff; font: 600 13px Figtree, sans-serif; color: #12161b; cursor: pointer">Flag dispute</button>
+              </sc-if>
+              <sc-if value="{{ride.canCancel}}" hint-placeholder-val="{{ false }}">
+                <button onClick="{{ride.cancel}}" style="{{ride.cancelStyle}}">{{ride.cancelLabel}}</button>
+              </sc-if>
+              <sc-if value="{{ride.confirming}}" hint-placeholder-val="{{ false }}">
+                <button onClick="{{ride.keep}}" style="height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid #d6d9d2; background: #ffffff; font: 600 13px Figtree, sans-serif; color: #12161b; cursor: pointer">Keep ride</button>
+              </sc-if>
+            </div>
+          </section>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ============ DRIVERS ============ -->
+    <sc-if value="{{v.drivers}}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: center">
+          <div style="display: flex; flex-wrap: wrap; gap: 6px" role="tablist" aria-label="Driver status">
+            <sc-for list="{{driverTabs}}" as="t" hint-placeholder-count="4">
+              <button role="tab" aria-selected="{{t.checked}}" onClick="{{t.pick}}" style="{{t.style}}">{{t.label}} <span style="opacity: 0.7">{{t.count}}</span></button>
+            </sc-for>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center">
+            <label for="dsearch" style="font-size: 13px; color: #5d645c">Search</label>
+            <input id="dsearch" placeholder="Name, phone or plate" value="{{driverQ}}" onChange="{{setDriverQ}}" style="height: 40px; width: 220px; max-width: 100%; box-sizing: border-box; padding: 0 12px; border-radius: 10px; border: 1px solid #d6d9d2; background: #ffffff; font: 14px Figtree, sans-serif; color: #12161b">
+          </div>
+        </div>
+        <section aria-label="Driver directory" style="background: #ffffff; border-radius: 14px; border: 1px solid #e6e8e3; overflow: hidden">
+          <div style="overflow-x: auto">
+            <table style="width: 100%; min-width: 860px; border-collapse: collapse; font-size: 14px">
+              <thead>
+                <tr style="text-align: left; color: #5d645c; font-size: 12px; background: #f8f9f6">
+                  <th style="padding: 10px 16px; font-weight: 600">Driver</th>
+                  <th style="padding: 10px 10px; font-weight: 600">Vehicle</th>
+                  <th style="padding: 10px 10px; font-weight: 600">Category</th>
+                  <th style="padding: 10px 10px; font-weight: 600; text-align: right">Rating</th>
+                  <th style="padding: 10px 10px; font-weight: 600; text-align: right">Trips</th>
+                  <th style="padding: 10px 10px; font-weight: 600; text-align: right">Net this week</th>
+                  <th style="padding: 10px 10px; font-weight: 600">Status</th>
+                  <th style="padding: 10px 16px; font-weight: 600"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Actions</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                <sc-for list="{{driverRows}}" as="d" hint-placeholder-count="8">
+                  <tr style="border-top: 1px solid #eceee9">
+                    <td style="padding: 10px 16px"><div style="font-weight: 600">{{d.name}}</div><div style="font-size: 12px; color: #5d645c">{{d.phone}}</div></td>
+                    <td style="padding: 10px 10px"><div>{{d.vehicle}}</div><div style="font-size: 12px; color: #5d645c; letter-spacing: 0.04em">{{d.plate}}</div></td>
+                    <td style="padding: 10px 10px">{{d.category}}</td>
+                    <td style="padding: 10px 10px; text-align: right; font-variant-numeric: tabular-nums">{{d.rating}}</td>
+                    <td style="padding: 10px 10px; text-align: right; font-variant-numeric: tabular-nums">{{d.trips}}</td>
+                    <td style="padding: 10px 10px; text-align: right; font-variant-numeric: tabular-nums">{{d.week}}</td>
+                    <td style="padding: 10px 10px"><span style="{{d.pillStyle}}">{{d.status}}</span></td>
+                    <td style="padding: 10px 16px; text-align: right"><button onClick="{{d.act}}" style="{{d.actStyle}}">{{d.actLabel}}</button></td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </sc-if>
+
+    <!-- ============ VERIFICATION ============ -->
+    <sc-if value="{{v.verification}}" hint-placeholder-val="{{ false }}">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; align-items: start">
+        <sc-for list="{{queue}}" as="q" hint-placeholder-count="4">
+          <section style="background: #ffffff; border-radius: 14px; border: 1px solid #e6e8e3; padding: 18px; display: flex; flex-direction: column; gap: 12px">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px">
+              <div>
+                <h2 style="margin: 0; font-size: 16px; font-weight: 700">{{q.name}}</h2>
+                <div style="font-size: 13px; color: #5d645c">{{q.vehicle}} · submitted {{q.submitted}}</div>
+              </div>
+              <span style="{{q.pillStyle}}">{{q.state}}</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px">
+              <sc-for list="{{q.docs}}" as="doc" hint-placeholder-count="5">
+                <div style="display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; background: #f8f9f6">
+                  <div style="flex: 1; min-width: 0">
+                    <div style="font-size: 14px; font-weight: 600">{{doc.label}}</div>
+                    <div style="font-size: 12px; color: #5d645c">{{doc.meta}}</div>
+                  </div>
+                  <sc-if value="{{doc.pending}}" hint-placeholder-val="{{ true }}">
+                    <div style="display: flex; gap: 6px">
+                      <button onClick="{{doc.reject}}" style="height: 34px; padding: 0 10px; border-radius: 8px; border: 1px solid #d6d9d2; background: #ffffff; font: 600 12px Figtree, sans-serif; color: #b3261e">Reject</button>
+                      <button onClick="{{doc.approve}}" style="height: 34px; padding: 0 10px; border-radius: 8px; border: 0; background: #12161b; font: 600 12px Figtree, sans-serif; color: #ffffff">Approve</button>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{doc.done}}" hint-placeholder-val="{{ false }}">
+                    <span style="display: flex; gap: 8px; align-items: center">
+                      <span style="{{doc.pillStyle}}">{{doc.status}}</span>
+                      <button onClick="{{doc.undo}}" style="border: 0; background: transparent; font: 600 12px Figtree, sans-serif; color: #5d645c; text-decoration: underline; cursor: pointer">Undo</button>
+                    </span>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between">
+              <div style="font-size: 13px; color: #5d645c">{{q.summary}}</div>
+              <sc-if value="{{q.canApproveAll}}" hint-placeholder-val="{{ true }}">
+                <button onClick="{{q.approveAll}}" style="height: 34px; padding: 0 12px; border-radius: 8px; border: 1px solid #12161b; background: #ffffff; font: 600 12px Figtree, sans-serif; color: #12161b; cursor: pointer">Approve all</button>
+              </sc-if>
+            </div>
+          </section>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <!-- ============ PASSENGERS ============ -->
+    <sc-if value="{{v.passengers}}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap">
+          <label for="psearch" style="font-size: 13px; color: #5d645c">Search</label>
+          <input id="psearch" placeholder="Name, phone or email" value="{{passengerQ}}" onChange="{{setPassengerQ}}" style="height: 40px; width: 260px; max-width: 100%; box-sizing: border-box; padding: 0 12px; border-radius: 10px; border: 1px solid #d6d9d2; background: #ffffff; font: 14px Figtree, sans-serif; color: #12161b">
+          <span style="font-size: 13px; color: #5d645c">{{passengerCount}}</span>
+        </div>
+        <section aria-label="Passengers" style="background: #ffffff; border-radius: 14px; border: 1px solid #e6e8e3; overflow: hidden">
+          <div style="overflow-x: auto">
+            <table style="width: 100%; min-width: 820px; border-collapse: collapse; font-size: 14px">
+              <thead>
+                <tr style="text-align: left; color: #5d645c; font-size: 12px; background: #f8f9f6">
+                  <th style="padding: 10px 16px; font-weight: 600">Passenger</th>
+                  <th style="padding: 10px 10px; font-weight: 600">Joined</th>
+                  <th style="padding: 10px 10px; font-weight: 600; text-align: right">Trips</th>
+                  <th style="padding: 10px 10px; font-weight: 600; text-align: right">Rating</th>
+                  <th style="padding: 10px 10px; font-weight: 600; text-align: right">Cancellations</th>
+                  <th style="padding: 10px 10px; font-weight: 600; text-align: right">Wallet</th>
+                  <th style="padding: 10px 10px; font-weight: 600">Status</th>
+                  <th style="padding: 10px 16px; font-weight: 600"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Actions</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                <sc-for list="{{passengerRows}}" as="p" hint-placeholder-count="7">
+                  <tr style="border-top: 1px solid #eceee9">
+                    <td style="padding: 10px 16px"><div style="font-weight: 600">{{p.name}}</div><div style="font-size: 12px; color: #5d645c">{{p.phone}}</div></td>
+                    <td style="padding: 10px 10px">{{p.joined}}</td>
+                    <td style="padding: 10px 10px; text-align: right; font-variant-numeric: tabular-nums">{{p.trips}}</td>
+                    <td style="padding: 10px 10px; text-align: right; font-variant-numeric: tabular-nums">{{p.rating}}</td>
+                    <td style="padding: 10px 10px; text-align: right; font-variant-numeric: tabular-nums">{{p.cancels}}</td>
+                    <td style="padding: 10px 10px; text-align: right; font-variant-numeric: tabular-nums">{{p.wallet}}</td>
+                    <td style="padding: 10px 10px"><span style="{{p.pillStyle}}">{{p.status}}</span></td>
+                    <td style="padding: 10px 16px; text-align: right"><button onClick="{{p.act}}" style="{{p.actStyle}}">{{p.actLabel}}</button></td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </sc-if>
+
+    <!-- ============ FINANCE ============ -->
+    <sc-if value="{{v.finance}}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; flex-direction: column; gap: 16px">
+        <section aria-label="Finance figures" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px">
+          <sc-for list="{{finKpis}}" as="k" hint-placeholder-count="5">
+            <div style="background: #ffffff; border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 6px; border: 1px solid #e6e8e3">
+              <span style="font-size: 13px; color: #5d645c; font-weight: 500">{{k.label}}</span>
+              <span style="font-family: 'Familjen Grotesk', Figtree, sans-serif; font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1">{{k.value}}</span>
+              <span style="font-size: 12px; color: #5d645c">{{k.note}}</span>
+            </div>
+          </sc-for>
+        </section>
+        <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start">
+          <section aria-label="Withdrawals awaiting approval" style="flex: 1 1 380px; min-width: 0; background: #ffffff; border-radius: 14px; border: 1px solid #e6e8e3; padding: 18px; display: flex; flex-direction: column; gap: 10px">
+            <h2 style="margin: 0; font-size: 16px; font-weight: 700">Withdrawals awaiting approval</h2>
+            <sc-for list="{{withdrawals}}" as="w" hint-placeholder-count="4">
+              <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; padding: 10px 12px; border-radius: 10px; background: #f8f9f6">
+                <div style="min-width: 0">
+                  <div style="font-weight: 600; font-size: 14px">{{w.driver}} · <span style="font-variant-numeric: tabular-nums">{{w.amount}}</span></div>
+                  <div style="font-size: 12px; color: #5d645c">{{w.bank}} · requested {{w.when}}</div>
+                </div>
+                <sc-if value="{{w.pending}}" hint-placeholder-val="{{ true }}">
+                  <div style="display: flex; gap: 6px">
+                    <button onClick="{{w.reject}}" style="height: 34px; padding: 0 10px; border-radius: 8px; border: 1px solid #d6d9d2; background: #ffffff; font: 600 12px Figtree, sans-serif; color: #b3261e">Reject</button>
+                    <button onClick="{{w.approve}}" style="height: 34px; padding: 0 10px; border-radius: 8px; border: 0; background: #12161b; font: 600 12px Figtree, sans-serif; color: #ffffff">Approve payout</button>
+                  </div>
+                </sc-if>
+                <sc-if value="{{w.done}}" hint-placeholder-val="{{ false }}">
+                  <span style="{{w.pillStyle}}">{{w.status}}</span>
+                </sc-if>
+              </div>
+            </sc-for>
+          </section>
+          <section aria-label="Unmatched webhooks" style="flex: 1 1 320px; min-width: 0; background: #ffffff; border-radius: 14px; border: 1px solid #e6e8e3; padding: 18px; display: flex; flex-direction: column; gap: 10px">
+            <h2 style="margin: 0; font-size: 16px; font-weight: 700">Unmatched payment webhooks</h2>
+            <sc-for list="{{webhooks}}" as="h" hint-placeholder-count="3">
+              <div style="display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 10px 12px; border-radius: 10px; background: #f8f9f6">
+                <div style="min-width: 0">
+                  <div style="font-weight: 600; font-size: 14px">{{h.provider}} · {{h.amount}}</div>
+                  <div style="font-size: 12px; color: #5d645c; word-break: break-all">{{h.ref}} · {{h.when}}</div>
+                </div>
+                <sc-if value="{{h.pending}}" hint-placeholder-val="{{ true }}">
+                  <button onClick="{{h.match}}" style="height: 34px; padding: 0 10px; border-radius: 8px; border: 1px solid #d6d9d2; background: #ffffff; font: 600 12px Figtree, sans-serif; color: #12161b; flex: none; cursor: pointer">Match</button>
+                </sc-if>
+                <sc-if value="{{h.done}}" hint-placeholder-val="{{ false }}">
+                  <span style="{{h.pillStyle}}">{{h.status}}</span>
+                </sc-if>
+              </div>
+            </sc-for>
+            <div style="font-size: 12px; color: #5d645c">Signature verified. No matching payment reference yet.</div>
+          </section>
+        </div>
+        <section aria-label="Ledger journal" style="background: #ffffff; border-radius: 14px; border: 1px solid #e6e8e3; overflow: hidden">
+          <div style="padding: 18px 18px 6px"><h2 style="margin: 0; font-size: 16px; font-weight: 700">Ledger journal</h2><div style="font-size: 12px; color: #5d645c">Every transaction balances: total debits equal total credits.</div></div>
+          <div style="overflow-x: auto">
+            <table style="width: 100%; min-width: 760px; border-collapse: collapse; font-size: 13px">
+              <thead>
+                <tr style="text-align: left; color: #5d645c; font-size: 12px">
+                  <th style="padding: 10px 18px; font-weight: 600">Time</th>
+                  <th style="padding: 10px 10px; font-weight: 600">Transaction</th>
+                  <th style="padding: 10px 10px; font-weight: 600">Account</th>
+                  <th style="padding: 10px 10px; font-weight: 600; text-align: right">Debit</th>
+                  <th style="padding: 10px 18px; font-weight: 600; text-align: right">Credit</th>
+                </tr>
+              </thead>
+              <tbody>
+                <sc-for list="{{ledger}}" as="l" hint-placeholder-count="9">
+                  <tr style="{{l.rowStyle}}">
+                    <td style="padding: 8px 18px; color: #5d645c; font-variant-numeric: tabular-nums">{{l.t}}</td>
+                    <td style="padding: 8px 10px; font-weight: 600">{{l.txn}}</td>
+                    <td style="padding: 8px 10px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px">{{l.account}}</td>
+                    <td style="padding: 8px 10px; text-align: right; font-variant-numeric: tabular-nums">{{l.dr}}</td>
+                    <td style="padding: 8px 18px; text-align: right; font-variant-numeric: tabular-nums">{{l.cr}}</td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </sc-if>
+
+    <!-- ============ PRICING ============ -->
+    <sc-if value="{{v.pricing}}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; flex-direction: column; gap: 16px">
+        <div style="display: flex; flex-wrap: wrap; gap: 6px" role="tablist" aria-label="Service area">
+          <sc-for list="{{areaTabs}}" as="t" hint-placeholder-count="3">
+            <button role="tab" aria-selected="{{t.checked}}" onClick="{{t.pick}}" style="{{t.style}}">{{t.label}}</button>
+          </sc-for>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start">
+          <section aria-label="Current pricing" style="flex: 3 1 480px; min-width: 0; background: #ffffff; border-radius: 14px; border: 1px solid #e6e8e3; overflow: hidden">
+            <div style="padding: 18px 18px 6px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; align-items: baseline">
+              <h2 style="margin: 0; font-size: 16px; font-weight: 700">{{areaName}} · version {{priceVersion}}</h2>
+              <span style="font-size: 12px; color: #5d645c">{{priceSince}}</span>
+            </div>
+            <div style="overflow-x: auto">
+              <table style="width: 100%; min-width: 700px; border-collapse: collapse; font-size: 14px">
+                <thead>
+                  <tr style="text-align: left; color: #5d645c; font-size: 12px">
+                    <th style="padding: 10px 18px; font-weight: 600">Category</th>
+                    <th style="padding: 10px 10px; font-weight: 600; text-align: right">Base</th>
+                    <th style="padding: 10px 10px; font-weight: 600; text-align: right">Per km</th>
+                    <th style="padding: 10px 10px; font-weight: 600; text-align: right">Per min</th>
+                    <th style="padding: 10px 10px; font-weight: 600; text-align: right">Min fare</th>
+                    <th style="padding: 10px 10px; font-weight: 600; text-align: right">Max fare</th>
+                    <th style="padding: 10px 18px; font-weight: 600; text-align: right">Commission</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <sc-for list="{{priceRows}}" as="p" hint-placeholder-count="4">
+                    <tr style="border-top: 1px solid #eceee9; font-variant-numeric: tabular-nums">
+                      <td style="padding: 10px 18px; font-weight: 600">{{p.cat}}</td>
+                      <td style="padding: 10px 10px; text-align: right">{{p.base}}</td>
+                      <td style="padding: 10px 10px; text-align: right">{{p.km}}</td>
+                      <td style="padding: 10px 10px; text-align: right">{{p.min}}</td>
+                      <td style="padding: 10px 10px; text-align: right">{{p.minFare}}</td>
+                      <td style="padding: 10px 10px; text-align: right">{{p.maxFare}}</td>
+                      <td style="padding: 10px 18px; text-align: right">{{p.comm}}</td>
+                    </tr>
+                  </sc-for>
+                </tbody>
+              </table>
+            </div>
+            <div style="padding: 12px 18px 18px; font-size: 12px; color: #5d645c">Requests already in negotiation keep the version they started with. Changes apply to new requests only.</div>
+          </section>
+          <section aria-label="New pricing version" style="flex: 2 1 300px; min-width: 0; background: #ffffff; border-radius: 14px; border: 1px solid #e6e8e3; padding: 18px; display: flex; flex-direction: column; gap: 12px">
+            <h2 style="margin: 0; font-size: 16px; font-weight: 700">Create version {{nextVersion}}</h2>
+            <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+              <div style="display: flex; flex-direction: column; gap: 4px">
+                <label for="pcomm" style="font-size: 12px; color: #5d645c; font-weight: 600">Commission %</label>
+                <input id="pcomm" value="15" style="height: 40px; box-sizing: border-box; padding: 0 10px; border-radius: 10px; border: 1px solid #d6d9d2; font: 14px Figtree, sans-serif; color: #12161b; background: #ffffff">
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 4px">
+                <label for="pmin" style="font-size: 12px; color: #5d645c; font-weight: 600">Economy min fare ₦</label>
+                <input id="pmin" value="1,500" style="height: 40px; box-sizing: border-box; padding: 0 10px; border-radius: 10px; border: 1px solid #d6d9d2; font: 14px Figtree, sans-serif; color: #12161b; background: #ffffff">
+              </div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 4px">
+              <label for="preason" style="font-size: 12px; color: #5d645c; font-weight: 600">Reason for change (required, saved to audit log)</label>
+              <textarea id="preason" rows="3" style="box-sizing: border-box; padding: 10px; border-radius: 10px; border: 1px solid #d6d9d2; font: 14px Figtree, sans-serif; color: #12161b; background: #ffffff; resize: vertical">Fuel price increase, November</textarea>
+            </div>
+            <button onClick="{{publishPrice}}" style="height: 44px; border-radius: 12px; border: 0; background: #12161b; color: #ffffff; font: 700 14px Figtree, sans-serif; cursor: pointer">Publish version {{nextVersion}}</button>
+            <sc-if value="{{pricePublished}}" hint-placeholder-val="{{ false }}">
+              <div style="font-size: 13px; color: #1f6b45; background: #e2f3ea; border-radius: 10px; padding: 10px 12px">Version {{priceVersion}} is live for {{areaName}}. The previous version was closed and kept in history.</div>
+            </sc-if>
+            <div style="display: flex; flex-direction: column; gap: 6px; padding-top: 6px; border-top: 1px solid #eceee9">
+              <h3 style="margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #5d645c">History</h3>
+              <sc-for list="{{priceHistory}}" as="h" hint-placeholder-count="3">
+                <div style="font-size: 13px"><span style="font-weight: 600">v{{h.v}}</span> · {{h.when}} · {{h.reason}}</div>
+              </sc-for>
+            </div>
+          </section>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ============ SUPPORT ============ -->
+    <sc-if value="{{v.support}}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start">
+        <section aria-label="Tickets" style="flex: 3 1 440px; min-width: 0; background: #ffffff; border-radius: 14px; border: 1px solid #e6e8e3; overflow: hidden">
+          <div style="overflow-x: auto">
+            <table style="width: 100%; min-width: 620px; border-collapse: collapse; font-size: 14px">
+              <thead>
+                <tr style="text-align: left; color: #5d645c; font-size: 12px; background: #f8f9f6">
+                  <th style="padding: 10px 14px; font-weight: 600">Ticket</th>
+                  <th style="padding: 10px 10px; font-weight: 600">Category</th>
+                  <th style="padding: 10px 10px; font-weight: 600">Priority</th>
+                  <th style="padding: 10px 10px; font-weight: 600">Status</th>
+                  <th style="padding: 10px 14px; font-weight: 600">Assignee</th>
+                </tr>
+              </thead>
+              <tbody>
+                <sc-for list="{{tickets}}" as="t" hint-placeholder-count="6">
+                  <tr style="{{t.rowStyle}}">
+                    <td style="padding: 8px 14px"><button onClick="{{t.open}}" style="border: 0; background: transparent; padding: 4px 0; text-align: left; cursor: pointer; font-family: Figtree, sans-serif; color: #12161b"><span style="display: block; font-weight: 700; font-size: 14px; text-decoration: underline">{{t.number}}</span><span style="display: block; font-size: 12px; color: #5d645c">{{t.subject}}</span></button></td>
+                    <td style="padding: 8px 10px">{{t.category}}</td>
+                    <td style="padding: 8px 10px"><span style="{{t.prioStyle}}">{{t.priority}}</span></td>
+                    <td style="padding: 8px 10px">{{t.status}}</td>
+                    <td style="padding: 8px 14px">{{t.assignee}}</td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section aria-label="Ticket thread" style="flex: 2 1 320px; min-width: 0; background: #ffffff; border-radius: 14px; border: 1px solid #e6e8e3; padding: 18px; display: flex; flex-direction: column; gap: 12px">
+          <div>
+            <h2 style="margin: 0; font-size: 16px; font-weight: 700">{{ticket.number}} · {{ticket.subject}}</h2>
+            <div style="font-size: 13px; color: #5d645c">{{ticket.requester}} · {{ticket.ride}}</div>
+          </div>
+          <sc-for list="{{ticket.thread}}" as="m" hint-placeholder-count="3">
+            <div style="{{m.style}}">
+              <div style="font-size: 12px; font-weight: 600; color: #5d645c">{{m.who}} · {{m.when}}</div>
+              <div style="font-size: 14px">{{m.body}}</div>
+            </div>
+          </sc-for>
+          <label for="reply" style="font-size: 12px; color: #5d645c; font-weight: 600">Reply</label>
+          <textarea id="reply" rows="3" placeholder="Write a reply to the customer" value="{{reply}}" onChange="{{setReply}}" style="box-sizing: border-box; padding: 10px; border-radius: 10px; border: 1px solid #d6d9d2; font: 14px Figtree, sans-serif; color: #12161b; background: #ffffff; resize: vertical"></textarea>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px">
+            <button onClick="{{ticket.assign}}" style="cursor: pointer; height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid #d6d9d2; background: #ffffff; font: 600 13px Figtree, sans-serif; color: #12161b">{{ticket.assignLabel}}</button>
+            <button onClick="{{ticket.note}}" style="height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid #d6d9d2; background: #ffffff; font: 600 13px Figtree, sans-serif; color: #12161b; cursor: pointer">Add internal note</button>
+            <button onClick="{{ticket.resolve}}" style="height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid #d6d9d2; background: #ffffff; font: 600 13px Figtree, sans-serif; color: #12161b; cursor: pointer">{{ticket.resolveLabel}}</button>
+            <button onClick="{{ticket.send}}" style="height: 40px; padding: 0 14px; border-radius: 10px; border: 0; background: #12161b; font: 700 13px Figtree, sans-serif; color: #ffffff; cursor: pointer">Send reply</button>
+          </div>
+        </section>
+      </div>
+    </sc-if>
+
+    <!-- ============ SAFETY ============ -->
+    <sc-if value="{{v.safety}}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; flex-direction: column; gap: 16px">
+        <section aria-label="Open incident" style="background: #ffffff; border-radius: 14px; border: 2px solid #b3261e; padding: 18px; display: flex; flex-direction: column; gap: 14px">
+          <div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; align-items: flex-start">
+            <div>
+              <div style="font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #b3261e">SOS · passenger</div>
+              <h2 style="margin: 0; font-size: 20px; font-weight: 700">Ride R-8M3TQ1 · Kubwa Expressway near Dutse junction</h2>
+              <div style="font-size: 13px; color: #5d645c">Passenger Blessing A. · Driver Sani K. · BWR 119 LA, white Toyota Corolla · raised 22:37</div>
+            </div>
+            <span style="{{incident.pillStyle}}">{{incident.label}}</span>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 16px">
+            <div style="flex: 1 1 280px; min-width: 0; display: flex; flex-direction: column; gap: 8px">
+              <h3 style="margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #5d645c">Timeline</h3>
+              <sc-for list="{{incident.timeline}}" as="e" hint-placeholder-count="3">
+                <div style="display: flex; gap: 10px; font-size: 13px">
+                  <span style="width: 44px; flex: none; color: #5d645c; font-variant-numeric: tabular-nums">{{e.t}}</span>
+                  <span style="flex: 1; min-width: 0">{{e.text}}</span>
+                </div>
+              </sc-for>
+            </div>
+            <div style="flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 8px">
+              <h3 style="margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #5d645c">Actions</h3>
+              <sc-if value="{{incident.canAck}}" hint-placeholder-val="{{ true }}">
+                <button onClick="{{incident.ack}}" style="height: 44px; border-radius: 12px; border: 0; background: #b3261e; color: #ffffff; font: 700 14px Figtree, sans-serif">Acknowledge and call passenger</button>
+              </sc-if>
+              <sc-if value="{{incident.canEscalate}}" hint-placeholder-val="{{ false }}">
+                <button onClick="{{incident.escalate}}" style="height: 44px; border-radius: 12px; border: 1px solid #12161b; background: #ffffff; color: #12161b; font: 700 14px Figtree, sans-serif">Record that I contacted emergency services</button>
+              </sc-if>
+              <sc-if value="{{incident.canResolve}}" hint-placeholder-val="{{ false }}">
+                <div style="display: flex; gap: 8px; flex-wrap: wrap">
+                  <button onClick="{{incident.resolve}}" style="flex: 1; height: 44px; border-radius: 12px; border: 0; background: #12161b; color: #ffffff; font: 700 14px Figtree, sans-serif">Resolve</button>
+                  <button onClick="{{incident.falseAlarm}}" style="flex: 1; height: 44px; border-radius: 12px; border: 1px solid #d6d9d2; background: #ffffff; color: #12161b; font: 600 14px Figtree, sans-serif">False alarm</button>
+                </div>
+              </sc-if>
+              <sc-if value="{{incident.closed}}" hint-placeholder-val="{{ false }}">
+                <button onClick="{{incident.reset}}" style="height: 40px; border-radius: 10px; border: 1px solid #d6d9d2; background: #ffffff; color: #5d645c; font: 600 13px Figtree, sans-serif">Reset demo</button>
+              </sc-if>
+              <div style="font-size: 12px; color: #5d645c; background: #f8f9f6; border-radius: 10px; padding: 10px 12px">The rider's app says emergency services were contacted only after an operator records it here. Emergency numbers shown to riders in Abuja: 112, 199.</div>
+            </div>
+          </div>
+        </section>
+        <section aria-label="Past incidents" style="background: #ffffff; border-radius: 14px; border: 1px solid #e6e8e3; overflow: hidden">
+          <div style="padding: 18px 18px 6px"><h2 style="margin: 0; font-size: 16px; font-weight: 700">Past incidents · last 30 days</h2></div>
+          <div style="overflow-x: auto">
+            <table style="width: 100%; min-width: 640px; border-collapse: collapse; font-size: 14px">
+              <thead>
+                <tr style="text-align: left; color: #5d645c; font-size: 12px">
+                  <th style="padding: 10px 18px; font-weight: 600">When</th>
+                  <th style="padding: 10px 10px; font-weight: 600">Type</th>
+                  <th style="padding: 10px 10px; font-weight: 600">Ride</th>
+                  <th style="padding: 10px 10px; font-weight: 600">Handled by</th>
+                  <th style="padding: 10px 18px; font-weight: 600">Outcome</th>
+                </tr>
+              </thead>
+              <tbody>
+                <sc-for list="{{pastIncidents}}" as="i" hint-placeholder-count="4">
+                  <tr style="border-top: 1px solid #eceee9">
+                    <td style="padding: 10px 18px; color: #5d645c">{{i.when}}</td>
+                    <td style="padding: 10px 10px; font-weight: 600">{{i.type}}</td>
+                    <td style="padding: 10px 10px">{{i.ride}}</td>
+                    <td style="padding: 10px 10px">{{i.by}}</td>
+                    <td style="padding: 10px 18px">{{i.outcome}}</td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </sc-if>
+
+    <!-- ============ SETTINGS ============ -->
+    <sc-if value="{{v.settings}}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; flex-direction: column; gap: 16px">
+        <div style="display: flex; flex-wrap: wrap; gap: 6px" role="tablist" aria-label="Settings sections">
+          <sc-for list="{{setTabs}}" as="t" hint-placeholder-count="4">
+            <button role="tab" aria-selected="{{t.checked}}" onClick="{{t.pick}}" style="{{t.style}}">{{t.label}}</button>
+          </sc-for>
+        </div>
+
+        <sc-if value="{{st.areas}}" hint-placeholder-val="{{ true }}">
+          <section aria-label="Service areas" style="background: #ffffff; border-radius: 14px; border: 1px solid #e6e8e3; overflow: hidden">
+            <div style="overflow-x: auto">
+              <table style="width: 100%; min-width: 680px; border-collapse: collapse; font-size: 14px">
+                <thead>
+                  <tr style="text-align: left; color: #5d645c; font-size: 12px; background: #f8f9f6">
+                    <th style="padding: 10px 18px; font-weight: 600">Service area</th>
+                    <th style="padding: 10px 10px; font-weight: 600">Hours</th>
+                    <th style="padding: 10px 10px; font-weight: 600; text-align: right">Search radius</th>
+                    <th style="padding: 10px 10px; font-weight: 600">Restricted categories</th>
+                    <th style="padding: 10px 18px; font-weight: 600">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <sc-for list="{{areas}}" as="a" hint-placeholder-count="4">
+                    <tr style="border-top: 1px solid #eceee9">
+                      <td style="padding: 10px 18px; font-weight: 600">{{a.name}}</td>
+                      <td style="padding: 10px 10px">{{a.hours}}</td>
+                      <td style="padding: 10px 10px; text-align: right; font-variant-numeric: tabular-nums">{{a.radius}}</td>
+                      <td style="padding: 10px 10px">{{a.restricted}}</td>
+                      <td style="padding: 10px 18px"><span style="{{a.pillStyle}}">{{a.status}}</span></td>
+                    </tr>
+                  </sc-for>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </sc-if>
+
+        <sc-if value="{{st.categories}}" hint-placeholder-val="{{ false }}">
+          <section aria-label="Vehicle categories" style="background: #ffffff; border-radius: 14px; border: 1px solid #e6e8e3; padding: 18px; display: flex; flex-direction: column; gap: 8px">
+            <h2 style="margin: 0; font-size: 16px; font-weight: 700">Categories enabled in Abuja</h2>
+            <sc-for list="{{catToggles}}" as="c" hint-placeholder-count="6">
+              <div style="display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; background: #f8f9f6">
+                <input type="checkbox" id="{{c.id}}" checked="{{c.on}}" onChange="{{c.toggle}}" style="width: 20px; height: 20px; accent-color: #12161b">
+                <label for="{{c.id}}" style="flex: 1; min-width: 0; cursor: pointer">
+                  <span style="display: block; font-weight: 600; font-size: 14px">{{c.name}}</span>
+                  <span style="display: block; font-size: 12px; color: #5d645c">{{c.note}}</span>
+                </label>
+                <span style="{{c.pillStyle}}">{{c.state}}</span>
+              </div>
+            </sc-for>
+          </section>
+        </sc-if>
+
+        <sc-if value="{{st.rules}}" hint-placeholder-val="{{ false }}">
+          <section aria-label="Platform rules" style="background: #ffffff; border-radius: 14px; border: 1px solid #e6e8e3; padding: 18px; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px">
+            <div style="grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap">
+              <h2 style="margin: 0; font-size: 16px; font-weight: 700">Platform rules</h2>
+              <button onClick="{{saveRules}}" style="height: 40px; padding: 0 14px; border-radius: 10px; border: 0; background: #12161b; font: 700 13px Figtree, sans-serif; color: #ffffff; cursor: pointer">Save changes</button>
+            </div>
+            <sc-for list="{{rules}}" as="r" hint-placeholder-count="6">
+              <div style="display: flex; flex-direction: column; gap: 4px">
+                <label for="{{r.id}}" style="font-size: 13px; font-weight: 600">{{r.label}}</label>
+                <input id="{{r.id}}" value="{{r.value}}" style="height: 40px; box-sizing: border-box; padding: 0 10px; border-radius: 10px; border: 1px solid #d6d9d2; font: 14px Figtree, sans-serif; color: #12161b; background: #ffffff">
+                <span style="font-size: 12px; color: #5d645c">{{r.help}}</span>
+              </div>
+            </sc-for>
+          </section>
+        </sc-if>
+
+        <sc-if value="{{st.admins}}" hint-placeholder-val="{{ false }}">
+          <section aria-label="Admins and roles" style="background: #ffffff; border-radius: 14px; border: 1px solid #e6e8e3; overflow: hidden">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; padding: 14px 18px">
+              <h2 style="margin: 0; font-size: 16px; font-weight: 700">Admins and roles</h2>
+              <button onClick="{{inviteAdmin}}" style="height: 40px; padding: 0 14px; border-radius: 10px; border: 1px solid #12161b; background: #ffffff; font: 600 13px Figtree, sans-serif; color: #12161b; cursor: pointer">Invite admin</button>
+            </div>
+            <div style="overflow-x: auto">
+              <table style="width: 100%; min-width: 640px; border-collapse: collapse; font-size: 14px">
+                <thead>
+                  <tr style="text-align: left; color: #5d645c; font-size: 12px; background: #f8f9f6">
+                    <th style="padding: 10px 18px; font-weight: 600">Admin</th>
+                    <th style="padding: 10px 10px; font-weight: 600">Role</th>
+                    <th style="padding: 10px 10px; font-weight: 600">Scope</th>
+                    <th style="padding: 10px 10px; font-weight: 600">2FA</th>
+                    <th style="padding: 10px 18px; font-weight: 600">Last active</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <sc-for list="{{admins}}" as="a" hint-placeholder-count="5">
+                    <tr style="border-top: 1px solid #eceee9">
+                      <td style="padding: 10px 18px; font-weight: 600">{{a.name}}</td>
+                      <td style="padding: 10px 10px">{{a.role}}</td>
+                      <td style="padding: 10px 10px">{{a.scope}}</td>
+                      <td style="padding: 10px 10px">{{a.mfa}}</td>
+                      <td style="padding: 10px 18px; color: #5d645c">{{a.last}}</td>
+                    </tr>
+                  </sc-for>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </sc-if>
+      </div>
+    </sc-if>
+
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1040}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      view: 'overview', rideFilter: 'all', rideId: 'R-7K2QX9', mapCat: 'all', driverFilter: 'all',
+      driverStatus: {}, passengerStatus: {}, docs: {}, wd: {}, area: 'central', priceBump: {}, pricePublished: false,
+      ticketId: 'T-004182', assigned: {}, incident: 'TRIGGERED', setTab: 'areas', cats: {},
+      toast: null, rideStatus: {}, rideNotes: {}, confirmCancel: null, matched: {}, reply: '', extraMsgs: {}, ticketStatus: {},
+      driverQ: '', passengerQ: '', admins: []
+    };
+  }
+  renderVals() {
+    var self = this;
+    var s = this.state;
+    var toast = function (msg) {
+      self.setState({ toast: msg });
+      clearTimeout(self._toastTimer);
+      self._toastTimer = setTimeout(function () { self.setState({ toast: null }); }, 4000);
+    };
+    var go = function (v, extra) { return function () { var o = { view: v }; if (extra) { for (var k in extra) o[k] = extra[k]; } self.setState(o); }; };
+    var pill = function (bg, fg) { return 'display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; background: ' + bg + '; color: ' + fg + ';'; };
+    var P = {
+      amber: pill('#fff6dd', '#7a4a00'), blue: pill('#e3eefb', '#1d4f8a'), green: pill('#e2f3ea', '#1f6b45'),
+      grey: pill('#eceee9', '#3d443c'), red: pill('#fbe5e3', '#8c1d17'), purple: pill('#efe8fb', '#5a2f9e')
+    };
+    var chip = function (on) { return 'height: 36px; padding: 0 14px; border-radius: 999px; font: 600 13px Figtree, sans-serif; cursor: pointer; ' + (on ? 'background: #12161b; color: #ffffff; border: 1px solid #12161b;' : 'background: #ffffff; color: #12161b; border: 1px solid #d6d9d2;'); };
+    var btnGhost = 'height: 34px; padding: 0 12px; border-radius: 8px; border: 1px solid #d6d9d2; background: #ffffff; font: 600 12px Figtree, sans-serif; cursor: pointer; ';
+
+    // ---------- views ----------
+    var views = [
+      ['overview', 'Overview', 'Abuja operations', 'Live figures for today compared with last Sunday', null],
+      ['map', 'Live map', 'Live map', 'Online drivers and trips in progress across Abuja', null],
+      ['rides', 'Rides', 'Rides', 'Every request, negotiation and trip, with full history', null],
+      ['drivers', 'Drivers', 'Drivers', 'Directory, performance and account status', null],
+      ['verification', 'Verification', 'Driver verification', 'Review documents before drivers can take paid rides', '12'],
+      ['passengers', 'Passengers', 'Passengers', 'Accounts, trip history and reported users', null],
+      ['finance', 'Finance', 'Finance', 'Revenue, payouts, reconciliation and the ledger', null],
+      ['pricing', 'Pricing', 'Fares and commission', 'Versioned pricing per service area and category', null],
+      ['support', 'Support', 'Support tickets', 'Complaints, lost property and payment issues', '9'],
+      ['safety', 'Safety', 'Safety incidents', 'SOS alerts and safety reports', s.incident === 'RESOLVED' || s.incident === 'FALSE_ALARM' ? null : '1'],
+      ['settings', 'Settings', 'Settings', 'Service areas, categories, platform rules and admins', null]
+    ];
+    var cur = views.filter(function (x) { return x[0] === s.view; })[0];
+    var v = {};
+    views.forEach(function (x) { v[x[0]] = x[0] === s.view; });
+    var nav = views.map(function (x) {
+      var on = x[0] === s.view;
+      return {
+        label: x[1], badge: x[4], current: on ? 'page' : 'false', go: go(x[0]),
+        style: 'display: flex; justify-content: space-between; align-items: center; min-height: 40px; padding: 0 12px; border-radius: 10px; border: 0; cursor: pointer; text-align: left; font: 600 14px Figtree, sans-serif; ' + (on ? 'background: #262c33; color: #ffffff;' : 'background: transparent; color: #c9cec7;'),
+        badgeStyle: 'font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 10px; ' + (x[0] === 'safety' ? 'background: #b3261e; color: #ffffff;' : 'background: #f2a900; color: #12161b;')
+      };
+    });
+
+    // ---------- rides data ----------
+    var statusPill = { 'Driver en route': P.amber, 'Trip started': P.blue, 'Completed': P.green, 'Expired, no offers': P.grey, 'Cancelled': P.red, 'Disputed': P.purple, 'Searching': P.amber };
+    var group = { 'Driver en route': 'active', 'Trip started': 'active', 'Searching': 'active', 'Completed': 'completed', 'Expired, no offers': 'cancelled', 'Cancelled': 'cancelled', 'Disputed': 'disputed' };
+    var R = [
+      { code: 'R-7K2QX9', passenger: 'Amaka O.', driver: 'Ibrahim S.', route: 'Wuse 2 → Airport', dist: '38.2 km · 41 min', proposed: '₦6,500', agreed: '₦6,500', payment: 'Cash', status: 'Driver en route', x: 46, y: 44,
+        neg: [['22:31', 'Amaka proposed ₦6,500 (suggested ₦7,200)'], ['22:31', 'Sent to 9 drivers within 3 km'], ['22:32', 'Ibrahim accepted ₦6,500'], ['22:32', 'Chinedu offered ₦7,000'], ['22:33', 'Musa offered ₦7,500'], ['22:33', 'Amaka accepted Ibrahim at ₦6,500. Fare locked.']],
+        hist: [['22:33', 'Driver selected'], ['22:34', 'Driver en route · ETA 4 min']] },
+      { code: 'R-7K2QW4', passenger: 'Tunde A.', driver: 'Musa B.', route: 'Maitama → Jabi Lake Mall', dist: '9.4 km · 18 min', proposed: '₦2,200', agreed: '₦2,600', payment: 'Card', status: 'Trip started', x: 70, y: 30,
+        neg: [['22:12', 'Tunde proposed ₦2,200'], ['22:12', 'Musa offered ₦2,600'], ['22:13', 'Tunde raised to ₦2,400'], ['22:13', 'Tunde accepted Musa at ₦2,600. Fare locked.']],
+        hist: [['22:13', 'Driver selected'], ['22:14', 'Driver en route'], ['22:19', 'Driver arrived'], ['22:21', 'Trip started · PIN verified']] },
+      { code: 'R-7K2QV8', passenger: 'Hauwa M.', driver: 'Chinedu E.', route: 'Garki Area 11 → Gwarinpa', dist: '16.8 km · 27 min', proposed: '₦3,800', agreed: '₦4,000', payment: 'Wallet', status: 'Completed', x: 0, y: 0,
+        neg: [['21:02', 'Hauwa proposed ₦3,800'], ['21:03', 'Chinedu offered ₦4,000'], ['21:03', 'Hauwa accepted at ₦4,000. Fare locked.']],
+        hist: [['21:03', 'Driver selected'], ['21:09', 'Driver arrived'], ['21:10', 'Trip started'], ['21:38', 'Trip completed · ₦4,000 paid from wallet · commission ₦600']] },
+      { code: 'R-7K2QT2', passenger: 'Femi K.', driver: '—', route: 'Lugbe → Area 1', dist: '14.1 km · 22 min', proposed: '₦2,500', agreed: '—', payment: 'Cash', status: 'Expired, no offers', x: 0, y: 0,
+        neg: [['20:41', 'Femi proposed ₦2,500 (suggested ₦3,400)'], ['20:42', 'Radius widened to 4.5 km, then 6 km'], ['20:44', 'Request expired with no offers']],
+        hist: [['20:44', 'Expired']] },
+      { code: 'R-7K2QS6', passenger: 'Zainab Y.', driver: 'Peter N.', route: 'Kubwa → Central Area', dist: '21.6 km · 33 min', proposed: '₦4,500', agreed: '₦5,000', payment: 'Card', status: 'Cancelled', x: 0, y: 0,
+        neg: [['20:10', 'Zainab proposed ₦4,500'], ['20:11', 'Peter offered ₦5,000'], ['20:11', 'Zainab accepted at ₦5,000. Fare locked.']],
+        hist: [['20:11', 'Driver selected'], ['20:13', 'Driver en route'], ['20:15', 'Cancelled by passenger within grace period · no fee']] },
+      { code: 'R-7K2QP3', passenger: 'Ngozi I.', driver: 'Yusuf D.', route: 'Asokoro → Wuse Market', dist: '7.9 km · 16 min', proposed: '₦2,000', agreed: '₦2,000', payment: 'Wallet', status: 'Disputed', x: 0, y: 0,
+        neg: [['19:20', 'Ngozi proposed ₦2,000'], ['19:20', 'Yusuf accepted ₦2,000. Fare locked.']],
+        hist: [['19:20', 'Driver selected'], ['19:26', 'Trip started'], ['19:44', 'Trip completed'], ['19:58', 'Passenger opened dispute: driver took a longer route']] },
+      { code: 'R-7K2QN7', passenger: 'Ifeanyi C.', driver: 'Aliyu T.', route: 'Jabi → Life Camp', dist: '5.2 km · 11 min', proposed: '₦1,800', agreed: '₦1,800', payment: 'Cash', status: 'Driver en route', x: 28, y: 36,
+        neg: [['22:35', 'Ifeanyi proposed ₦1,800'], ['22:35', 'Aliyu accepted ₦1,800. Fare locked.']],
+        hist: [['22:35', 'Driver selected'], ['22:36', 'Driver en route']] },
+      { code: 'R-8M3TQ1', passenger: 'Blessing A.', driver: 'Sani K.', route: 'Kubwa → Dutse', dist: '11.0 km · 19 min', proposed: '₦2,800', agreed: '₦3,000', payment: 'Card', status: 'Trip started', x: 14, y: 14,
+        neg: [['22:20', 'Blessing proposed ₦2,800'], ['22:21', 'Sani offered ₦3,000'], ['22:21', 'Blessing accepted at ₦3,000. Fare locked.']],
+        hist: [['22:21', 'Driver selected'], ['22:28', 'Trip started'], ['22:37', 'SOS raised by passenger']] }
+    ];
+    var openRide = function (code) { return go('rides', { rideId: code }); };
+    var rs = function (r) { return s.rideStatus[r.code] || r.status; };
+    var setRide = function (code, status, note, msg) {
+      var st1 = Object.assign({}, s.rideStatus); st1[code] = status;
+      var n1 = Object.assign({}, s.rideNotes); n1[code] = (n1[code] || []).concat([['now', note]]);
+      self.setState({ rideStatus: st1, rideNotes: n1, confirmCancel: null });
+      toast(msg);
+    };
+    var mkRide = function (r) {
+      var status = rs(r);
+      var active = group[status] === 'active';
+      var confirming = s.confirmCancel === r.code;
+      return { code: r.code, passenger: r.passenger, driver: r.driver, route: r.route, distance: r.dist, agreed: r.agreed, payment: r.payment,
+        fares: r.proposed + ' → ' + r.agreed, status: status, pillStyle: statusPill[status], open: openRide(r.code),
+        neg: r.neg.map(function (e) { return { t: e[0], text: e[1] }; }),
+        hist: r.hist.concat(s.rideNotes[r.code] || []).map(function (e) { return { t: e[0], text: e[1] }; }),
+        canCancel: active, canDispute: status === 'Completed' || status === 'Trip started', confirming: confirming,
+        cancelLabel: confirming ? 'Confirm cancellation' : 'Cancel ride',
+        cancelStyle: 'cursor: pointer; height: 40px; padding: 0 12px; border-radius: 10px; font: 600 13px Figtree, sans-serif; ' + (confirming ? 'border: 0; background: #b3261e; color: #ffffff;' : 'border: 1px solid #b3261e; background: #ffffff; color: #b3261e;'),
+        message: function () { toast('Message sent to ' + r.passenger + (r.driver !== '—' ? ' and ' + r.driver : '') + ' about ' + r.code + '.'); },
+        dispute: function () { setRide(r.code, 'Disputed', 'Flagged for dispute review by Ops Lead', r.code + ' flagged as disputed. Driver earnings are on hold.'); },
+        cancel: function () {
+          if (!confirming) return self.setState({ confirmCancel: r.code });
+          setRide(r.code, 'Cancelled', 'Cancelled by Ops Lead', r.code + ' cancelled. Both parties were notified and the driver is free for new requests.');
+        },
+        keep: function () { self.setState({ confirmCancel: null }); } };
+    };
+    var rideTabsDef = [['all', 'All'], ['active', 'Active'], ['completed', 'Completed'], ['cancelled', 'Cancelled'], ['disputed', 'Disputed']];
+    var rideTabs = rideTabsDef.map(function (t) {
+      var n = t[0] === 'all' ? R.length : R.filter(function (r) { return group[rs(r)] === t[0]; }).length;
+      return { label: t[1], count: String(n), checked: s.rideFilter === t[0] ? 'true' : 'false', style: chip(s.rideFilter === t[0]), pick: function () { self.setState({ rideFilter: t[0] }); } };
+    });
+    var rideRows = R.filter(function (r) { return s.rideFilter === 'all' || group[rs(r)] === s.rideFilter; }).map(function (r) {
+      var o = mkRide(r); o.rowStyle = 'border-top: 1px solid #eceee9; ' + (r.code === s.rideId ? 'background: #fff9e8;' : ''); return o;
+    });
+    var ride = mkRide(R.filter(function (r) { return r.code === s.rideId; })[0] || R[0]);
+    var active = R.filter(function (r) { return group[rs(r)] === 'active'; });
+
+    // ---------- overview ----------
+    var up = 'font-size: 12px; font-weight: 600; color: #1f7a4f;';
+    var down = 'font-size: 12px; font-weight: 600; color: #b3261e;';
+    var flat = 'font-size: 12px; font-weight: 600; color: #5d645c;';
+    var kpis = [
+      { label: 'Active trips', value: '142', delta: 'Live now', deltaStyle: flat },
+      { label: 'Online drivers', value: '486', delta: '+38 vs last Sun', deltaStyle: up },
+      { label: 'Completed today', value: '2,931', delta: '+11.4%', deltaStyle: up },
+      { label: 'Cancellation rate', value: '7.8%', delta: '+0.9 pts', deltaStyle: down },
+      { label: 'Commission today', value: '₦3.84m', delta: '+9.2%', deltaStyle: up },
+      { label: 'Driver wallets owed', value: '₦21.6m', delta: 'Liability', deltaStyle: flat }
+    ];
+    var counts = [22, 64, 148, 231, 198, 140, 121, 133, 152, 139, 147, 171, 226, 259, 214, 160, 97, 58];
+    var hours = counts.map(function (c, i) {
+      var peak = c === 259 || c === 231;
+      return { tip: (5 + i) + ':00, ' + c + ' rides', style: 'flex: 1; border-radius: 4px 4px 0 0; height: ' + Math.round((c / 259) * 170) + 'px; background: ' + (peak ? '#f2a900' : '#12161b') + ';' };
+    });
+    var dot = function (c) { return 'width: 10px; height: 10px; border-radius: 5px; margin-top: 5px; flex: none; background: ' + c + ';'; };
+    var alerts = [
+      { title: 'SOS raised on ride R-8M3TQ1', detail: 'Kubwa Expressway · emergency contacts notified', dotStyle: dot('#b3261e'), go: go('safety') },
+      { title: '12 driver documents awaiting review', detail: 'Oldest submitted 19 hours ago', dotStyle: dot('#f2a900'), go: go('verification') },
+      { title: '3 unmatched payment webhooks', detail: 'Paystack · need reconciliation', dotStyle: dot('#f2a900'), go: go('finance') },
+      { title: '1 ride under dispute', detail: 'R-7K2QP3 · route complaint', dotStyle: dot('#5a2f9e'), go: openRide('R-7K2QP3') }
+    ];
+
+    // ---------- live map ----------
+    var mapCatsDef = [['all', 'All'], ['Economy', 'Economy'], ['Comfort', 'Comfort'], ['Premium', 'Premium'], ['SUV', 'SUV']];
+    var catCycle = ['Economy', 'Economy', 'Comfort', 'Economy', 'Premium', 'Economy', 'SUV', 'Comfort'];
+    var pts = [[8, 12], [18, 20], [22, 52], [30, 40], [34, 70], [40, 30], [44, 58], [52, 46], [56, 24], [60, 66], [64, 38], [68, 16], [72, 54], [76, 30], [80, 72], [84, 44], [88, 22], [12, 80], [26, 86], [48, 80], [62, 84], [90, 60], [36, 18], [16, 42]];
+    var drvDots = pts.map(function (p, i) { return { x: p[0], y: p[1], cat: catCycle[i % catCycle.length], on: i % 3 === 0 }; });
+    active.forEach(function (r) { if (r.x) drvDots.push({ x: r.x, y: r.y, cat: 'Economy', on: true, sos: r.code === 'R-8M3TQ1' && s.incident !== 'RESOLVED' && s.incident !== 'FALSE_ALARM' }); });
+    var shown = drvDots.filter(function (d) { return s.mapCat === 'all' || d.cat === s.mapCat; });
+    var mapDots = shown.map(function (d) {
+      var bg = d.sos ? '#b3261e' : (d.on ? '#f2a900' : '#1f7a4f');
+      var size = d.sos ? 16 : 12;
+      return { tip: d.cat + (d.on ? ', on trip' : ', free'), style: 'position: absolute; left: ' + d.x + '%; top: ' + d.y + '%; width: ' + size + 'px; height: ' + size + 'px; margin: -' + (size / 2) + 'px 0 0 -' + (size / 2) + 'px; border-radius: 50%; background: ' + bg + '; border: 2px solid ' + (d.sos ? '#ffffff' : '#12161b') + '; box-sizing: border-box;' + (d.sos ? ' box-shadow: 0 0 0 6px rgba(179,38,30,0.25);' : '') };
+    });
+    var mapCats = mapCatsDef.map(function (c) { return { label: c[1], checked: s.mapCat === c[0] ? 'true' : 'false', style: chip(s.mapCat === c[0]), pick: function () { self.setState({ mapCat: c[0] }); } }; });
+
+    // ---------- drivers ----------
+    var D = [
+      ['d1', 'Ibrahim Sule', '0803 *** 4412', 'Toyota Corolla 2016', 'BWR 482 KD', 'Economy', '4.92', '1,248', '₦96,400', 'Active'],
+      ['d2', 'Musa Bello', '0806 *** 1180', 'Toyota Camry 2018', 'ABC 731 FG', 'Comfort', '4.97', '2,031', '₦142,900', 'Active'],
+      ['d3', 'Chinedu Eze', '0812 *** 9034', 'Honda Accord 2015', 'KUJ 208 AB', 'Economy', '4.88', '806', '₦71,250', 'Active'],
+      ['d4', 'Peter Nwosu', '0705 *** 6621', 'Lexus RX 350 2017', 'GWA 590 CD', 'SUV', '4.81', '412', '₦58,700', 'Active'],
+      ['d5', 'Yusuf Danjuma', '0903 *** 2287', 'Toyota Corolla 2014', 'ABJ 144 XY', 'Economy', '4.41', '1,902', '₦63,100', 'Suspended'],
+      ['d6', 'Aliyu Tanko', '0818 *** 5530', 'Kia Rio 2019', 'BWR 337 EF', 'Economy', '4.90', '233', '₦38,900', 'Active'],
+      ['d7', 'Grace Okafor', '0802 *** 7719', 'Toyota Highlander 2019', 'AMC 902 JK', 'SUV', '—', '0', '—', 'Pending'],
+      ['d8', 'Emeka Obi', '0909 *** 3341', 'Hyundai Elantra 2017', 'ABJ 671 LM', 'Comfort', '—', '0', '—', 'Pending']
+    ];
+    var dStatus = function (d) { return s.driverStatus[d[0]] || d[9]; };
+    var dTabsDef = [['all', 'All'], ['Active', 'Active'], ['Suspended', 'Suspended'], ['Pending', 'Pending verification']];
+    var driverTabs = dTabsDef.map(function (t) {
+      var n = t[0] === 'all' ? D.length : D.filter(function (d) { return dStatus(d) === t[0]; }).length;
+      return { label: t[1], count: String(n), checked: s.driverFilter === t[0] ? 'true' : 'false', style: chip(s.driverFilter === t[0]), pick: function () { self.setState({ driverFilter: t[0] }); } };
+    });
+    var dq = s.driverQ.trim().toLowerCase();
+    var driverRows = D.filter(function (d) { return (s.driverFilter === 'all' || dStatus(d) === s.driverFilter) && (!dq || (d[1] + ' ' + d[2] + ' ' + d[4]).toLowerCase().indexOf(dq) > -1); }).map(function (d) {
+      var st = dStatus(d);
+      var next = st === 'Active' ? 'Suspended' : (st === 'Suspended' ? 'Active' : null);
+      return { name: d[1], phone: d[2], vehicle: d[3], plate: d[4], category: d[5], rating: d[6], trips: d[7], week: d[8], status: st,
+        pillStyle: st === 'Active' ? P.green : (st === 'Suspended' ? P.red : P.amber),
+        actLabel: st === 'Active' ? 'Suspend' : (st === 'Suspended' ? 'Reactivate' : 'Review'),
+        actStyle: btnGhost + (st === 'Active' ? 'color: #b3261e;' : 'color: #12161b;'),
+        act: next ? function () { var m = Object.assign({}, s.driverStatus); m[d[0]] = next; self.setState({ driverStatus: m }); toast(d[1] + (next === 'Suspended' ? ' suspended and taken offline.' : ' reactivated. They can go online again.')); } : go('verification') };
+    });
+
+    // ---------- verification ----------
+    var Q = [
+      ['q1', 'Grace Okafor', 'Toyota Highlander 2019 · SUV', '19 h ago'],
+      ['q2', 'Emeka Obi', 'Hyundai Elantra 2017 · Comfort', '7 h ago'],
+      ['q3', 'Halima Yakubu', 'Toyota Corolla 2015 · Economy', '3 h ago'],
+      ['q4', 'Kelechi Udo', 'Honda Civic 2016 · Economy', '40 min ago']
+    ];
+    var docTypes = [['lic', "Driver's licence", 'FRSC · expires Mar 2029'], ['reg', 'Vehicle registration', 'FCT MVAA · expires Jan 2027'], ['ins', 'Insurance', 'Third party · expires Aug 2027'], ['road', 'Roadworthiness', 'Expires Feb 2027'], ['photo', 'Profile photo', 'Face match 98%']];
+    var queue = Q.map(function (q) {
+      var approved = 0, rejected = 0;
+      var docs = docTypes.map(function (t) {
+        var key = q[0] + ':' + t[0];
+        var st = s.docs[key];
+        if (st === 'Approved') approved++;
+        if (st === 'Rejected') rejected++;
+        var set = function (val) { return function () { var m = Object.assign({}, s.docs); if (val) m[key] = val; else delete m[key]; self.setState({ docs: m }); if (val) toast(t[1] + ' for ' + q[1] + ' ' + val.toLowerCase() + '.'); }; };
+        return { label: t[1], meta: t[2], pending: !st, done: !!st, status: st || '', pillStyle: st === 'Approved' ? P.green : P.red, approve: set('Approved'), reject: set('Rejected'), undo: set(null) };
+      });
+      var state = rejected ? 'Changes requested' : (approved === docTypes.length ? 'Approved' : 'Pending review');
+      var pendingCount = docTypes.length - approved - rejected;
+      var approveAll = function () {
+        var m = Object.assign({}, s.docs);
+        docTypes.forEach(function (t2) { var k = q[0] + ':' + t2[0]; if (!m[k]) m[k] = 'Approved'; });
+        self.setState({ docs: m });
+        toast(rejected ? 'Remaining documents for ' + q[1] + ' approved.' : q[1] + ' approved. They can now go online.');
+      };
+      return { name: q[1], vehicle: q[2], submitted: q[3], docs: docs, state: state, canApproveAll: pendingCount > 0, approveAll: approveAll,
+        pillStyle: state === 'Approved' ? P.green : (rejected ? P.red : P.amber),
+        summary: state === 'Approved' ? 'All documents approved. Driver can now go online.' : (rejected ? rejected + ' document(s) rejected. The driver is asked to re-upload.' : approved + ' of ' + docTypes.length + ' documents approved.') };
+    });
+
+    // ---------- passengers ----------
+    var PS = [
+      ['p1', 'Amaka Okonkwo', '0803 *** 2290', 'Mar 2026', '84', '4.87', '3', '₦12,300', 'Active'],
+      ['p2', 'Tunde Adeyemi', '0816 *** 4471', 'Jan 2026', '152', '4.91', '5', '₦0', 'Active'],
+      ['p3', 'Hauwa Musa', '0701 *** 8812', 'May 2026', '37', '4.95', '0', '₦4,000', 'Active'],
+      ['p4', 'Femi Kolawole', '0905 *** 1203', 'Oct 2026', '6', '4.60', '2', '₦0', 'Active'],
+      ['p5', 'Zainab Yusuf', '0810 *** 6654', 'Jun 2026', '29', '4.83', '4', '₦1,500', 'Active'],
+      ['p6', 'Victor Ade', '0703 *** 9921', 'Aug 2026', '18', '3.92', '11', '₦0', 'Suspended'],
+      ['p7', 'Ngozi Ibe', '0808 *** 3367', 'Feb 2026', '96', '4.89', '1', '₦7,800', 'Reported']
+    ];
+    var pq = s.passengerQ.trim().toLowerCase();
+    var passengerRows = PS.filter(function (p) { return !pq || (p[1] + ' ' + p[2]).toLowerCase().indexOf(pq) > -1; }).map(function (p) {
+      var st = s.passengerStatus[p[0]] || p[8];
+      return { name: p[1], phone: p[2], joined: p[3], trips: p[4], rating: p[5], cancels: p[6], wallet: p[7], status: st,
+        pillStyle: st === 'Active' ? P.green : (st === 'Suspended' ? P.red : P.amber),
+        actLabel: st === 'Suspended' ? 'Reactivate' : 'Suspend', actStyle: btnGhost + (st === 'Suspended' ? 'color: #12161b;' : 'color: #b3261e;'),
+        act: function () { var m = Object.assign({}, s.passengerStatus); m[p[0]] = st === 'Suspended' ? 'Active' : 'Suspended'; self.setState({ passengerStatus: m }); toast(p[1] + (st === 'Suspended' ? ' reactivated.' : ' suspended. They cannot book rides until reactivated.')); } };
+    });
+
+    // ---------- finance ----------
+    var finKpis = [
+      { label: 'Gross bookings today', value: '₦25.6m', note: 'Cash ₦14.1m · electronic ₦11.5m' },
+      { label: 'Platform commission', value: '₦3.84m', note: '15% average' },
+      { label: 'Cash commission owed', value: '₦2.11m', note: 'Driver wallets below zero' },
+      { label: 'Wallet liabilities', value: '₦21.6m', note: 'Passenger ₦6.2m · driver ₦15.4m' },
+      { label: 'Paystack settlement', value: '₦9.82m', note: 'Expected ₦9.84m · ₦20,000 to reconcile' }
+    ];
+    var W = [['w1', 'Musa Bello', '₦640,000', 'GTBank ••3318', '2 h ago'], ['w2', 'Peter Nwosu', '₦515,500', 'Access ••0912', '5 h ago'], ['w3', 'Aliyu Tanko', '₦82,000', 'Opay ••7741', '6 h ago'], ['w4', 'Ibrahim Sule', '₦120,000', 'Zenith ••5520', 'yesterday']];
+    var withdrawals = W.map(function (w) {
+      var st = s.wd[w[0]];
+      var set = function (val) { return function () { var m = Object.assign({}, s.wd); m[w[0]] = val; self.setState({ wd: m }); toast(val === 'Approved' ? 'Payout of ' + w[2] + ' to ' + w[1] + ' approved. Transfer queued to ' + w[3] + '.' : 'Withdrawal for ' + w[1] + ' rejected. ' + w[2] + ' returned to their available balance.'); }; };
+      return { driver: w[1], amount: w[2], bank: w[3], when: w[4], pending: !st, done: !!st, status: st === 'Approved' ? 'Approved · transfer queued' : 'Rejected · funds released', pillStyle: st === 'Approved' ? P.green : P.red, approve: set('Approved'), reject: set('Rejected') };
+    });
+    var webhooks = [
+      { provider: 'Paystack', amount: '₦5,000', ref: 'T8372615509', when: '21:14', who: 'Amaka O.' },
+      { provider: 'Paystack', amount: '₦10,000', ref: 'T8372620147', when: '21:52', who: 'Tunde A.' },
+      { provider: 'Paystack', amount: '₦5,000', ref: 'T8372631882', when: '22:05', who: 'Femi K.' }
+    ].map(function (h) {
+      var done = !!s.matched[h.ref];
+      return Object.assign({}, h, { pending: !done, done: done, status: 'Matched · ' + h.who + ' wallet top-up', pillStyle: P.green,
+        match: function () { var m = Object.assign({}, s.matched); m[h.ref] = true; self.setState({ matched: m }); toast(h.amount + ' Paystack payment matched to ' + h.who + "'s wallet top-up and credited."); } });
+    });
+    var L = [
+      ['21:38', 'Ride payment · R-7K2QV8', 'WAL:Hauwa:AVAILABLE', '₦4,000', '', 1],
+      ['', '', 'WAL:Chinedu:PENDING', '', '₦3,400', 1],
+      ['', '', 'SYS:COMMISSION_REVENUE', '', '₦600', 1],
+      ['20:51', 'Cash commission · R-7K2QK2', 'WAL:Yusuf:AVAILABLE', '₦450', '', 0],
+      ['', '', 'SYS:COMMISSION_REVENUE', '', '₦450', 0],
+      ['20:30', 'Wallet top-up · Paystack', 'SYS:PAYSTACK_CLEARING', '₦10,000', '', 1],
+      ['', '', 'WAL:Amaka:AVAILABLE', '', '₦10,000', 1],
+      ['19:02', 'Withdrawal hold · Ibrahim', 'WAL:Ibrahim:AVAILABLE', '₦120,000', '', 0],
+      ['', '', 'WAL:Ibrahim:HELD', '', '₦120,000', 0]
+    ];
+    var ledger = L.map(function (l) { return { t: l[0], txn: l[1], account: l[2], dr: l[3], cr: l[4], rowStyle: (l[0] ? 'border-top: 1px solid #e1e4dd;' : '') + (l[5] ? '' : ' background: #fafbf8;') }; });
+
+    // ---------- pricing ----------
+    var areasDef = [['central', 'Abuja Central', 3, 'Active since 14 Oct by Ops Lead'], ['kubwa', 'Kubwa', 2, 'Active since 2 Sep by Ops Lead'], ['lugbe', 'Lugbe', 2, 'Active since 2 Sep by Ops Lead']];
+    var area = areasDef.filter(function (a) { return a[0] === s.area; })[0];
+    var bumped = !!s.priceBump[s.area];
+    var version = area[2] + (bumped ? 1 : 0);
+    var areaTabs = areasDef.map(function (a) { return { label: a[1], checked: s.area === a[0] ? 'true' : 'false', style: chip(s.area === a[0]), pick: function () { self.setState({ area: a[0], pricePublished: false }); } }; });
+    var mult = s.area === 'central' ? 1 : 0.92;
+    var n = function (x) { return '₦' + Math.round(x * mult / 10) * 10; };
+    var fmt = function (x) { var r = Math.round(x * mult / 10) * 10; return '₦' + r.toLocaleString('en-US'); };
+    var priceRows = [
+      ['Economy', 500, 120, 15, bumped ? 1500 : 1200, 25000],
+      ['Comfort', 700, 160, 20, bumped ? 1900 : 1600, 35000],
+      ['Premium', 1200, 240, 30, bumped ? 2800 : 2500, 60000],
+      ['SUV', 1400, 280, 35, bumped ? 3300 : 3000, 70000]
+    ].map(function (p) { return { cat: p[0], base: fmt(p[1]), km: n(p[2]), min: n(p[3]), minFare: fmt(p[4]), maxFare: fmt(p[5]), comm: '15%' }; });
+    var priceHistory = (bumped ? [{ v: version, when: 'just now', reason: 'Fuel price increase, November' }] : []).concat(
+      s.area === 'central' ? [{ v: 3, when: '14 Oct', reason: 'Raised Premium per-km rate' }, { v: 2, when: '2 Sep', reason: 'Added SUV category' }, { v: 1, when: '18 Aug', reason: 'Launch pricing' }]
+      : [{ v: 2, when: '2 Sep', reason: 'Added SUV category' }, { v: 1, when: '18 Aug', reason: 'Launch pricing' }]);
+
+    // ---------- support ----------
+    var T = [
+      ['T-004182', 'Charged twice for ride R-7K2QB1', 'Payment', 'High', 'Open', 'Hauwa M.', 'R-7K2QB1',
+        [['Hauwa M.', '21:50', 'I was charged ₦3,200 twice on my card for the same trip.'], ['System', '21:50', 'Linked payments: 1 succeeded, 1 reversed by Paystack at 21:52.']]],
+      ['T-004181', 'Left my bag in the car', 'Lost property', 'Normal', 'Awaiting customer', 'Tunde A.', 'R-7K2QF9',
+        [['Tunde A.', '20:12', 'Black laptop bag, back seat.'], ['Kemi (Support)', '20:30', 'Driver Musa confirmed he has it. Where should he drop it?']]],
+      ['T-004180', 'Driver asked for extra money', 'Trip issue', 'High', 'Open', 'Zainab Y.', 'R-7K2QC4',
+        [['Zainab Y.', '19:41', 'We agreed ₦4,500 but the driver asked for ₦5,500 at the end.']]],
+      ['T-004179', 'Cannot add my card', 'Account', 'Low', 'Open', 'Femi K.', '—',
+        [['Femi K.', '18:05', 'Card verification keeps failing.']]],
+      ['T-004178', 'Passenger was rude and damaged seat', 'Driver complaint', 'Normal', 'Resolved', 'Peter N.', 'R-7K2PZ2',
+        [['Peter N.', 'Sat', 'Passenger spilled drink and tore the seat cover.'], ['Kemi (Support)', 'Sat', 'Cleaning fee of ₦3,000 approved and credited to your wallet.']]],
+      ['T-004177', 'Promo code did not apply', 'Payment', 'Low', 'Resolved', 'Ngozi I.', 'R-7K2PY0',
+        [['Ngozi I.', 'Sat', 'WELCOME20 was not applied.'], ['Kemi (Support)', 'Sat', 'Code is first-ride only. Refunded ₦400 as goodwill.']]]
+    ];
+    var prio = { High: P.red, Normal: P.grey, Low: P.blue };
+    var assignee = function (t) { return s.assigned[t[0]] ? 'You' : (t[4] === 'Open' ? 'Unassigned' : 'Kemi'); };
+    var tStatus = function (t) { return s.ticketStatus[t[0]] || t[4]; };
+    var tickets = T.map(function (t) { return { number: t[0], subject: t[1], category: t[2], priority: t[3], prioStyle: prio[t[3]], status: tStatus(t), assignee: assignee(t), open: function () { self.setState({ ticketId: t[0] }); }, rowStyle: 'border-top: 1px solid #eceee9; ' + (t[0] === s.ticketId ? 'background: #fff9e8;' : '') }; });
+    var tk = T.filter(function (t) { return t[0] === s.ticketId; })[0];
+    var ticket = { number: tk[0], subject: tk[1], requester: tk[5], ride: tk[6] === '—' ? 'no ride linked' : 'ride ' + tk[6],
+      thread: tk[7].concat(s.extraMsgs[tk[0]] || []).map(function (m) {
+        var internal = m[3] === 'internal';
+        var staff = internal || m[0].indexOf('Support') > -1 || m[0].indexOf('Ops Lead') > -1 || m[0] === 'System';
+        return { who: internal ? m[0] + ' · internal note' : m[0], when: m[1], body: m[2], style: 'padding: 10px 12px; border-radius: 12px; display: flex; flex-direction: column; gap: 2px; ' + (internal ? 'background: #efe8fb; margin-left: 24px; border: 1px dashed #5a2f9e;' : staff ? 'background: #f4f5f1; margin-left: 24px;' : 'background: #fff6dd; margin-right: 24px;') };
+      }),
+      assignLabel: s.assigned[tk[0]] ? 'Unassign me' : 'Assign to me',
+      assign: function () { var m = Object.assign({}, s.assigned); m[tk[0]] = !m[tk[0]]; self.setState({ assigned: m }); toast(m[tk[0]] ? tk[0] + ' assigned to you.' : tk[0] + ' unassigned.'); },
+      send: function () {
+        var text = s.reply.trim();
+        if (!text) return toast('Write a reply first.');
+        var m = Object.assign({}, s.extraMsgs); m[tk[0]] = (m[tk[0]] || []).concat([['Ops Lead (Support)', 'now', text, 'reply']]);
+        var ts = Object.assign({}, s.ticketStatus); ts[tk[0]] = 'Awaiting customer';
+        self.setState({ extraMsgs: m, ticketStatus: ts, reply: '' });
+        toast('Reply sent to ' + tk[5] + '. Ticket is now awaiting the customer.');
+      },
+      note: function () {
+        var text = s.reply.trim();
+        if (!text) return toast('Write the note in the box first.');
+        var m = Object.assign({}, s.extraMsgs); m[tk[0]] = (m[tk[0]] || []).concat([['Ops Lead', 'now', text, 'internal']]);
+        self.setState({ extraMsgs: m, reply: '' });
+        toast('Internal note added. The customer cannot see it.');
+      },
+      resolveLabel: tStatus(tk) === 'Resolved' ? 'Reopen' : 'Mark resolved',
+      resolve: function () {
+        var ts = Object.assign({}, s.ticketStatus); var reopen = tStatus(tk) === 'Resolved'; ts[tk[0]] = reopen ? 'Open' : 'Resolved';
+        self.setState({ ticketStatus: ts });
+        toast(reopen ? tk[0] + ' reopened.' : tk[0] + ' marked resolved.');
+      } };
+
+    // ---------- safety ----------
+    var inc = s.incident;
+    var tl = [['22:37', 'Passenger pressed SOS during trip'], ['22:37', 'SMS with live trip link sent to 2 emergency contacts'], ['22:37', 'Alert shown to Abuja ops room']];
+    if (inc !== 'TRIGGERED') tl.push(['22:39', 'Acknowledged by Ops Lead · called passenger']);
+    if (inc === 'ESCALATED' || inc === 'RESOLVED') tl.push(['22:41', 'Ops Lead recorded: called FCT police control room, reference given']);
+    if (inc === 'RESOLVED') tl.push(['22:58', 'Resolved · passenger confirmed safe at destination']);
+    if (inc === 'FALSE_ALARM') tl.push(['22:44', 'Marked false alarm · passenger pressed by mistake']);
+    var incLabel = { TRIGGERED: 'Needs acknowledgement', ACKNOWLEDGED: 'Acknowledged', ESCALATED: 'Escalated externally', RESOLVED: 'Resolved', FALSE_ALARM: 'False alarm' }[inc];
+    var incMsg = { ACKNOWLEDGED: 'Incident acknowledged. Call the passenger now.', ESCALATED: 'Recorded that you contacted emergency services.', RESOLVED: 'Incident resolved.', FALSE_ALARM: 'Marked as a false alarm.', TRIGGERED: 'Demo reset.' };
+    var setInc = function (val) { return function () { self.setState({ incident: val }); toast(incMsg[val]); }; };
+    var incident = {
+      label: incLabel, pillStyle: inc === 'TRIGGERED' ? P.red : (inc === 'RESOLVED' || inc === 'FALSE_ALARM' ? P.green : P.amber),
+      timeline: tl.map(function (e) { return { t: e[0], text: e[1] }; }),
+      canAck: inc === 'TRIGGERED', canEscalate: inc === 'ACKNOWLEDGED', canResolve: inc === 'ACKNOWLEDGED' || inc === 'ESCALATED', closed: inc === 'RESOLVED' || inc === 'FALSE_ALARM',
+      ack: setInc('ACKNOWLEDGED'), escalate: setInc('ESCALATED'), resolve: setInc('RESOLVED'), falseAlarm: setInc('FALSE_ALARM'), reset: setInc('TRIGGERED')
+    };
+    var pastIncidents = [
+      { when: '28 Oct, 23:12', type: 'SOS', ride: 'R-7J9MA4', by: 'Ops Lead', outcome: 'False alarm' },
+      { when: '24 Oct, 19:40', type: 'Unsafe driving report', ride: 'R-7J4KC1', by: 'Kemi', outcome: 'Driver warned, 3-day suspension' },
+      { when: '17 Oct, 08:05', type: 'Accident', ride: 'R-7HZ2D8', by: 'Ops Lead', outcome: 'Minor, no injuries · insurance claim opened' },
+      { when: '9 Oct, 21:30', type: 'Harassment report', ride: 'R-7HM7F3', by: 'Ops Lead', outcome: 'Passenger account closed' }
+    ];
+
+    // ---------- settings ----------
+    var setTabsDef = [['areas', 'Service areas'], ['categories', 'Vehicle categories'], ['rules', 'Platform rules'], ['admins', 'Admins and roles']];
+    var setTabs = setTabsDef.map(function (t) { return { label: t[1], checked: s.setTab === t[0] ? 'true' : 'false', style: chip(s.setTab === t[0]), pick: function () { self.setState({ setTab: t[0] }); } }; });
+    var st = {}; setTabsDef.forEach(function (t) { st[t[0]] = t[0] === s.setTab; });
+    var areas = [
+      { name: 'Abuja Central', hours: '05:00 to 23:30', radius: '3.0 to 8.0 km', restricted: 'Motorcycle, Tricycle', status: 'Active', pillStyle: P.green },
+      { name: 'Kubwa', hours: '05:00 to 23:00', radius: '3.0 to 10.0 km', restricted: 'Motorcycle', status: 'Active', pillStyle: P.green },
+      { name: 'Lugbe', hours: '05:00 to 23:00', radius: '3.0 to 10.0 km', restricted: 'Motorcycle', status: 'Active', pillStyle: P.green },
+      { name: 'Gwagwalada', hours: '—', radius: '—', restricted: '—', status: 'Paused', pillStyle: P.grey }
+    ];
+    var catDef = [['economy', 'Economy', '4 seats · cars 2010 or newer', true], ['comfort', 'Comfort', '4 seats · cars 2014 or newer, AC required', true], ['premium', 'Premium', '4 seats · executive sedans 2017 or newer', true], ['suv', 'SUV', '6 seats', true], ['moto', 'Motorcycle', 'Awaiting legal review for FCT restrictions', false], ['trike', 'Tricycle', 'Awaiting legal review for FCT restrictions', false]];
+    var catToggles = catDef.map(function (c) {
+      var on = s.cats[c[0]] === undefined ? c[3] : s.cats[c[0]];
+      return { id: 'cat-' + c[0], name: c[1], note: c[2], on: on, state: on ? 'Enabled' : 'Off', pillStyle: on ? P.green : P.grey,
+        toggle: function () { var m = Object.assign({}, s.cats); m[c[0]] = !on; self.setState({ cats: m }); toast(c[1] + (on ? ' turned off in Abuja. Drivers in this category go offline.' : ' enabled in Abuja.')); } };
+    });
+    var rules = [
+      { id: 'r-ttl', label: 'Request lifetime', value: '180 seconds', help: 'How long passengers wait for offers before the request expires' },
+      { id: 'r-offer', label: 'Offer lifetime', value: '45 seconds', help: 'How long a driver offer stays valid' },
+      { id: 'r-radius', label: 'Radius step', value: '1.5 km', help: 'How far the search widens when too few drivers respond' },
+      { id: 'r-grace', label: 'Free cancellation window', value: '2 minutes', help: 'After acceptance, before a fee applies' },
+      { id: 'r-neg', label: 'Driver cash commission limit', value: '₦5,000', help: 'Drivers owing more cannot go online' },
+      { id: 'r-pending', label: 'Earnings hold before payout', value: '24 hours', help: 'Time electronic earnings stay pending' }
+    ];
+    var admins = [
+      { name: 'Ops Lead (you)', role: 'Super admin', scope: 'All cities', mfa: 'On', last: 'Now' },
+      { name: 'Kemi Adebayo', role: 'Support agent', scope: 'Abuja', mfa: 'On', last: '12 min ago' },
+      { name: 'Bala Garba', role: 'Finance', scope: 'All cities', mfa: 'On', last: '3 h ago' },
+      { name: 'Ruth Danladi', role: 'Verification officer', scope: 'Abuja', mfa: 'On', last: 'Yesterday' },
+      { name: 'Samuel Ojo', role: 'Ops agent', scope: 'Abuja', mfa: 'Not set up', last: 'Invited 2 days ago' }
+    ].concat(s.admins);
+
+    return {
+      nav: nav, v: v, title: cur[2], subtitle: cur[3], goRides: go('rides', { rideFilter: 'all' }),
+      kpis: kpis, hours: hours, alerts: alerts, recentRides: R.slice(0, 6).map(mkRide),
+      mapCats: mapCats, mapDots: mapDots, mapCount: String(mapDots.length), activeRides: active.map(mkRide),
+      rideTabs: rideTabs, rideRows: rideRows, ride: ride,
+      driverTabs: driverTabs, driverRows: driverRows, queue: queue, passengerRows: passengerRows,
+      finKpis: finKpis, withdrawals: withdrawals, webhooks: webhooks, ledger: ledger,
+      areaTabs: areaTabs, areaName: area[1], priceVersion: String(version), nextVersion: String(version + 1), priceSince: bumped ? 'Active since just now by Ops Lead' : area[3],
+      priceRows: priceRows, priceHistory: priceHistory, pricePublished: s.pricePublished,
+      publishPrice: function () { if (bumped) return toast('Version ' + version + ' is already live. Change a value to publish another version.'); var m = Object.assign({}, s.priceBump); m[s.area] = true; self.setState({ priceBump: m, pricePublished: true }); toast('Pricing version ' + (version + 1) + ' published for ' + area[1] + '.'); },
+      tickets: tickets, ticket: ticket, incident: incident, pastIncidents: pastIncidents,
+      setTabs: setTabs, st: st, areas: areas, catToggles: catToggles, rules: rules, admins: admins,
+      toast: s.toast, dismissToast: function () { self.setState({ toast: null }); },
+      exportCsv: function () { toast('CSV of ' + cur[2] + ' prepared. In this preview no file is downloaded; the live dashboard saves it to your computer.'); },
+      driverQ: s.driverQ, setDriverQ: function (e) { self.setState({ driverQ: e.target.value }); },
+      passengerQ: s.passengerQ, setPassengerQ: function (e) { self.setState({ passengerQ: e.target.value }); },
+      passengerCount: pq ? passengerRows.length + ' matching passenger(s)' : '48,210 passengers in Abuja',
+      reply: s.reply, setReply: function (e) { self.setState({ reply: e.target.value }); },
+      saveRules: function () { toast('Platform rules saved. The change is recorded in the audit log.'); },
+      inviteAdmin: function () {
+        var n = s.admins.length + 1;
+        self.setState({ admins: s.admins.concat([{ name: 'New admin ' + n, role: 'Ops agent', scope: 'Abuja', mfa: 'Not set up', last: 'Invited just now' }]) });
+        toast('Invitation sent. The new admin must set up 2FA on first sign-in.');
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

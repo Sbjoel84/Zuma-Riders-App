@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Driver incoming request</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&amp;family=Figtree:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#f2a900}a:hover{color:#ffc53d}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; position: relative; overflow: hidden; background: #12161b; font-family: Figtree, 'Segoe UI', system-ui, sans-serif; color: #f1f3ee">
+
+  <svg width="390" height="844" viewBox="0 0 390 844" aria-hidden="true" style="position: absolute; inset: 0; display: block">
+    <rect width="390" height="844" fill="#1a1f25"></rect>
+    <path d="M-10 160 L400 210" stroke="#262c33" stroke-width="16"></path>
+    <path d="M100 -10 L150 860" stroke="#262c33" stroke-width="12"></path>
+    <path d="M-10 330 L400 290" stroke="#262c33" stroke-width="12"></path>
+    <path d="M290 -10 L320 860" stroke="#262c33" stroke-width="10"></path>
+    <circle cx="200" cy="250" r="40" fill="#f2a900" fill-opacity="0.12"></circle>
+    <circle cx="200" cy="250" r="8" fill="#f2a900"></circle>
+  </svg>
+
+  <div style="position: absolute; top: 56px; left: 16px; right: 16px; display: flex; flex-direction: column; gap: 10px">
+    <div style="display: flex; justify-content: space-between; align-items: center">
+      <button style="height: 44px; padding: 0 16px; border-radius: 22px; border: 0; background: #1f7a4f; color: #ffffff; font: 700 14px Figtree, sans-serif; display: flex; align-items: center; gap: 8px">
+        <span style="width: 8px; height: 8px; border-radius: 4px; background: #ffffff" aria-hidden="true"></span>
+        Online · Wuse zone
+      </button>
+      <div style="text-align: right">
+        <div style="font-family: 'Familjen Grotesk', Figtree, sans-serif; font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums">₦18,400</div>
+        <div style="font-size: 12px; color: #a9b0a8">Today · 6 trips</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="position: absolute; left: 12px; right: 12px; bottom: 20px; box-sizing: border-box; background: #ffffff; color: #12161b; border-radius: 24px; padding: 18px 18px 16px; display: flex; flex-direction: column; gap: 14px">
+    <div style="display: flex; justify-content: space-between; align-items: center">
+      <span style="font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #5d645c">New request · Economy</span>
+      <span style="font-size: 13px; font-weight: 700; color: #9a5b00; font-variant-numeric: tabular-nums">0:38</span>
+    </div>
+    <div style="height: 4px; border-radius: 2px; background: #eceee9; overflow: hidden; margin-top: -6px">
+      <div style="width: 70%; height: 4px; background: #f2a900"></div>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; align-items: flex-end">
+      <div>
+        <div style="font-size: 13px; color: #5d645c">Passenger offers</div>
+        <div style="font-family: 'Familjen Grotesk', Figtree, sans-serif; font-size: 40px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums">₦6,500</div>
+      </div>
+      <div style="text-align: right; font-size: 13px">
+        <div style="font-weight: 600">Amaka · ★ 4.87</div>
+        <div style="color: #1f7a4f; font-weight: 600">Cash</div>
+      </div>
+    </div>
+
+    <div style="display: flex; gap: 12px">
+      <div style="display: flex; flex-direction: column; align-items: center; padding-top: 6px; gap: 4px" aria-hidden="true">
+        <div style="width: 10px; height: 10px; border-radius: 5px; border: 3px solid #12161b; box-sizing: border-box"></div>
+        <div style="flex: 1; width: 2px; background: #d6d9d2"></div>
+        <div style="width: 10px; height: 10px; border-radius: 2px; background: #f2a900; border: 2px solid #12161b; box-sizing: border-box"></div>
+      </div>
+      <div style="flex: 1; display: flex; flex-direction: column; gap: 8px; font-size: 14px">
+        <div><span style="font-weight: 600">Wuse 2</span> <span style="color: #5d645c">· 1.2 km, 3 min to pickup</span></div>
+        <div><span style="font-weight: 600">Nnamdi Azikiwe Airport</span> <span style="color: #5d645c">· 38.2 km, 41 min</span></div>
+      </div>
+    </div>
+
+    <a href="Driver.dc.html" style="display: flex; align-items: center; justify-content: center; height: 54px; border-radius: 16px; background: #12161b; color: #ffffff; text-decoration: none; font-weight: 700; font-size: 16px">Accept for ₦6,500</a>
+
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <span style="font-size: 13px; font-weight: 600">Or offer your price</span>
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px" role="radiogroup" aria-label="Counter-offer amount">
+        <sc-for list="{{counters}}" as="c" hint-placeholder-count="3">
+          <button role="radio" aria-checked="{{c.checked}}" onClick="{{c.pick}}" style="{{c.style}}">{{c.label}}</button>
+        </sc-for>
+      </div>
+      <div style="display: flex; gap: 8px">
+        <button style="flex: 1; height: 48px; border-radius: 14px; border: 1px solid #e1e4dd; background: #ffffff; font: 600 14px Figtree, sans-serif; color: #5d645c">Skip</button>
+        <button style="flex: 2; height: 48px; border-radius: 14px; border: 0; background: #f2a900; font: 700 15px Figtree, sans-serif; color: #12161b">Send offer {{pickedLabel}}</button>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { picked: 7500 };
+  }
+  renderVals() {
+    var self = this;
+    var opts = [7000, 7500, 8000];
+    var label = function (n) { return '₦' + n.toLocaleString('en-US'); };
+    var base = 'height: 46px; border-radius: 12px; font: 700 15px Figtree, sans-serif; font-variant-numeric: tabular-nums; cursor: pointer; ';
+    return {
+      counters: opts.map(function (n) {
+        var on = n === self.state.picked;
+        return {
+          label: label(n),
+          checked: on ? 'true' : 'false',
+          style: base + (on ? 'background: #fff6dd; color: #12161b; border: 2px solid #f2a900;' : 'background: #ffffff; color: #12161b; border: 2px solid #e1e4dd;'),
+          pick: function () { self.setState({ picked: n }); }
+        };
+      }),
+      pickedLabel: label(this.state.picked)
+    };
+  }
+}
+</script>
+</body>
+</html>

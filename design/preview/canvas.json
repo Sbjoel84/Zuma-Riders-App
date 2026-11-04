@@ -1,0 +1,19 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-11-01T21:40:00Z" },
+  "title": "Ride Platform App Preview",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 390, "h": 844, "title": "Passenger · Set route & offer fare", "is_interactive": true, "radius": 32 },
+    "Offers.dc.html": { "x": 470, "y": 0, "w": 390, "h": 844, "title": "Passenger · Compare driver offers", "is_interactive": true, "radius": 32 },
+    "Trip.dc.html": { "x": 940, "y": 0, "w": 390, "h": 844, "title": "Passenger · Driver on the way", "is_interactive": true, "radius": 32 },
+    "Driver.dc.html": { "x": 1410, "y": 0, "w": 390, "h": 844, "title": "Driver · Incoming request", "is_interactive": true, "radius": 32 },
+    "Admin.dc.html": { "x": 0, "y": 1084, "w": 1440, "h": 1040, "title": "Admin · Operations console", "expand": "fill", "is_interactive": true }
+  },
+  "order": ["Main.dc.html", "Offers.dc.html", "Trip.dc.html", "Driver.dc.html", "Admin.dc.html"],
+  "notes": {
+    "flow": { "x": 0, "y": -300, "text": "Booking flow: passenger proposes, drivers counter, passenger picks", "kind": "title1", "maxW": 1800 }
+  },
+  "designSystems": []
+}

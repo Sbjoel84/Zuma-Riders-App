@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Set route and offer fare</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&amp;family=Figtree:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#12161b}a:hover{color:#000}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; position: relative; overflow: hidden; background: #f4f5f1; font-family: Figtree, 'Segoe UI', system-ui, sans-serif; color: #12161b">
+
+  <div style="position: absolute; inset: 0 0 auto 0; height: 380px; background: #e6e9e2">
+    <svg width="390" height="380" viewBox="0 0 390 380" aria-hidden="true" style="display: block">
+      <rect width="390" height="380" fill="#e6e9e2"></rect>
+      <path d="M-10 90 L400 140" stroke="#ffffff" stroke-width="14"></path>
+      <path d="M-10 250 L400 210" stroke="#ffffff" stroke-width="18"></path>
+      <path d="M90 -10 L140 390" stroke="#ffffff" stroke-width="10"></path>
+      <path d="M260 -10 L300 390" stroke="#ffffff" stroke-width="12"></path>
+      <path d="M-10 330 Q 200 300 400 360" stroke="#ffffff" stroke-width="8" fill="none"></path>
+      <rect x="160" y="150" width="70" height="44" rx="6" fill="#d3e2cf"></rect>
+      <rect x="20" y="160" width="52" height="60" rx="6" fill="#d3e2cf"></rect>
+      <path d="M118 120 C 160 170, 230 160, 282 230" stroke="#12161b" stroke-width="4" fill="none" stroke-dasharray="1 0"></path>
+      <circle cx="118" cy="120" r="9" fill="#12161b"></circle>
+      <circle cx="118" cy="120" r="4" fill="#ffffff"></circle>
+      <rect x="274" y="222" width="16" height="16" rx="3" fill="#f2a900" stroke="#12161b" stroke-width="3"></rect>
+      <g fill="#12161b">
+        <rect x="200" y="96" width="14" height="8" rx="2"></rect>
+        <rect x="60" y="244" width="14" height="8" rx="2" transform="rotate(-8 67 248)"></rect>
+        <rect x="320" y="150" width="14" height="8" rx="2" transform="rotate(20 327 154)"></rect>
+        <rect x="150" y="300" width="14" height="8" rx="2"></rect>
+      </g>
+    </svg>
+    <div style="position: absolute; top: 56px; left: 16px; right: 16px; display: flex; justify-content: space-between; align-items: center">
+      <button aria-label="Menu" style="width: 44px; height: 44px; border-radius: 22px; border: 0; background: #ffffff; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(18,22,27,0.12)">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#12161b" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10"></path></svg>
+      </button>
+      <div style="padding: 8px 14px; border-radius: 22px; background: #12161b; color: #ffffff; font-family: 'Familjen Grotesk', Figtree, sans-serif; font-weight: 700; font-size: 18px; letter-spacing: 0.01em">zuma</div>
+      <button aria-label="Wallet, balance ₦12,300" style="height: 44px; padding: 0 14px; border-radius: 22px; border: 0; background: #ffffff; font: 600 14px Figtree, sans-serif; color: #12161b; box-shadow: 0 2px 8px rgba(18,22,27,0.12)">₦12,300</button>
+    </div>
+  </div>
+
+  <div style="position: absolute; left: 0; right: 0; bottom: 0; height: 500px; box-sizing: border-box; background: #ffffff; border-radius: 24px 24px 0 0; padding: 12px 20px 28px; display: flex; flex-direction: column; gap: 16px; box-shadow: 0 -4px 24px rgba(18,22,27,0.08)">
+    <div style="width: 40px; height: 4px; border-radius: 2px; background: #d6d9d2; align-self: center"></div>
+
+    <div style="display: flex; gap: 12px; align-items: stretch">
+      <div style="display: flex; flex-direction: column; align-items: center; padding-top: 6px; gap: 4px" aria-hidden="true">
+        <div style="width: 10px; height: 10px; border-radius: 5px; border: 3px solid #12161b; box-sizing: border-box"></div>
+        <div style="flex: 1; width: 2px; background: #d6d9d2"></div>
+        <div style="width: 10px; height: 10px; border-radius: 2px; background: #f2a900; border: 2px solid #12161b; box-sizing: border-box"></div>
+      </div>
+      <div style="flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0">
+        <div>
+          <div style="font-size: 12px; color: #5d645c; font-weight: 500">Pickup</div>
+          <div style="font-size: 15px; font-weight: 600">Wuse 2, Aminu Kano Crescent</div>
+        </div>
+        <div style="height: 1px; background: #eceee9"></div>
+        <div>
+          <div style="font-size: 12px; color: #5d645c; font-weight: 500">Destination</div>
+          <div style="font-size: 15px; font-weight: 600">Nnamdi Azikiwe Int'l Airport</div>
+        </div>
+      </div>
+      <div style="align-self: center; text-align: right; font-size: 12px; color: #5d645c; line-height: 1.4">38.2 km<br>41 min</div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px" role="radiogroup" aria-label="Vehicle category">
+      <sc-for list="{{categories}}" as="cat" hint-placeholder-count="4">
+        <button role="radio" aria-checked="{{cat.checked}}" onClick="{{cat.pick}}" style="{{cat.style}}">
+          <svg width="28" height="16" viewBox="0 0 28 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 11h22M5 11l2.5-6h13L23 11M3 11v3h3v-2M25 11v3h-3v-2"></path></svg>
+          <span style="font-size: 13px; font-weight: 600">{{cat.name}}</span>
+          <span style="font-size: 11px; opacity: 0.75">{{cat.seats}}</span>
+        </button>
+      </sc-for>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <div style="display: flex; justify-content: space-between; align-items: baseline">
+        <span style="font-size: 13px; font-weight: 600">Offer your fare</span>
+        <span style="font-size: 12px; color: #5d645c">Suggested {{suggestedText}}</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; background: #f4f5f1; border-radius: 16px; padding: 8px">
+        <button aria-label="Lower fare by ₦100" onClick="{{dec}}" style="width: 48px; height: 48px; border-radius: 12px; border: 0; background: #ffffff; font: 600 24px Figtree, sans-serif; color: #12161b">−</button>
+        <div style="flex: 1; text-align: center; font-family: 'Familjen Grotesk', Figtree, sans-serif; font-size: 36px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.01em">{{fareText}}</div>
+        <button aria-label="Raise fare by ₦100" onClick="{{inc}}" style="width: 48px; height: 48px; border-radius: 12px; border: 0; background: #ffffff; font: 600 24px Figtree, sans-serif; color: #12161b">+</button>
+      </div>
+      <sc-if value="{{low}}" hint-placeholder-val="{{ false }}">
+        <div style="font-size: 12px; color: #9a5b00">Below the suggested fare. Fewer drivers may respond.</div>
+      </sc-if>
+      <sc-if value="{{atMin}}" hint-placeholder-val="{{ false }}">
+        <div style="font-size: 12px; color: #b3261e">Minimum fare for this trip is {{minText}}.</div>
+      </sc-if>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 14px">
+      <button style="display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 12px; border-radius: 12px; border: 1px solid #e1e4dd; background: #ffffff; font: 600 14px Figtree, sans-serif; color: #12161b">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1f7a4f" stroke-width="2" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"></rect><circle cx="12" cy="12" r="2.5"></circle></svg>
+        Cash
+      </button>
+      <button style="height: 44px; padding: 0 12px; border-radius: 12px; border: 0; background: transparent; font: 500 14px Figtree, sans-serif; color: #5d645c">Add note for driver</button>
+    </div>
+
+    <a href="Offers.dc.html" style="margin-top: auto; display: flex; align-items: center; justify-content: center; height: 56px; border-radius: 16px; background: #12161b; color: #ffffff; text-decoration: none; font-weight: 700; font-size: 16px">Find drivers for {{fareText}}</a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { cat: 'economy', fare: 6500 };
+  }
+  renderVals() {
+    var cats = [
+      { id: 'economy', name: 'Economy', seats: '4 seats', suggested: 7200, min: 4800 },
+      { id: 'comfort', name: 'Comfort', seats: '4 seats', suggested: 9000, min: 6000 },
+      { id: 'premium', name: 'Premium', seats: '4 seats', suggested: 13500, min: 9000 },
+      { id: 'suv', name: 'SUV', seats: '6 seats', suggested: 15000, min: 10500 }
+    ];
+    var self = this;
+    var cur = cats.filter(function (c) { return c.id === self.state.cat; })[0];
+    var naira = function (n) { return '₦' + n.toLocaleString('en-US'); };
+    var fare = this.state.fare;
+    var base = 'height: 84px; border-radius: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-family: Figtree, sans-serif; cursor: pointer; ';
+    return {
+      categories: cats.map(function (c) {
+        var on = c.id === self.state.cat;
+        return {
+          name: c.name, seats: c.seats, checked: on ? 'true' : 'false',
+          style: base + (on ? 'background: #12161b; color: #ffffff; border: 2px solid #12161b;' : 'background: #ffffff; color: #12161b; border: 2px solid #e1e4dd;'),
+          pick: function () { self.setState({ cat: c.id, fare: c.suggested - 700 }); }
+        };
+      }),
+      fareText: naira(fare),
+      suggestedText: naira(cur.suggested),
+      minText: naira(cur.min),
+      low: fare < cur.suggested && fare > cur.min,
+      atMin: fare <= cur.min,
+      dec: function () { self.setState({ fare: Math.max(cur.min, fare - 100) }); },
+      inc: function () { self.setState({ fare: Math.min(cur.suggested * 2.5, fare + 100) }); }
+    };
+  }
+}
+</script>
+</body>
+</html>
