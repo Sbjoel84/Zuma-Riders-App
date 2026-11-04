@@ -205,6 +205,7 @@ function TripEnded({ ride, onDone }: { ride: RideView; onDone: () => void }) {
           </Card>
         ) : null}
         <Button title="Done" onPress={onDone} />
+        <Button title="Report a problem with this trip" kind="ghost" onPress={() => router.push({ pathname: "/(app)/report", params: { rideId: ride.id } })} />
       </View>
     </Screen>
   );

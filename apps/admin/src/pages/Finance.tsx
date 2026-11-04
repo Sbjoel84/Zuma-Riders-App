@@ -31,7 +31,7 @@ export function Finance() {
             ) : (
               <p className="flex items-center gap-2 text-sm text-ok-text"><span className="size-2 rounded-full bg-ok" />Ledger check passed: every transaction balances and every wallet matches its ledger.</p>
             )}
-            <section className="grid grid-cols-[repeat(auto-fit,minmax(190px,1fr))] gap-3">
+            <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
               <Kpi label="Gross bookings" value={naira(s.gross, { compact: true })} note={`${s.trips} trips · cash ${naira(s.cashGross, { compact: true })} · wallet ${naira(s.walletGross, { compact: true })}`} />
               <Kpi label="Platform commission" value={naira(s.commission, { compact: true })} note={BigInt(s.cancellationFees) > 0n ? `+ ${naira(s.cancellationFees)} cancellation fees` : "Booked when trips complete"} />
               <Kpi label="Cash commission owed" value={naira(s.cashCommissionOwed, { compact: true })} note={`${s.driversOwing} driver(s) below zero`} tone={s.driversOwing ? "down" : "muted"} />

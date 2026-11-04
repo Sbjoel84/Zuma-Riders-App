@@ -185,6 +185,7 @@ function TripSummary({ ride, onDone }: { ride: RideView; onDone: () => void }) {
           <Muted variant="body">This trip was cancelled. You're available for new requests.</Muted>
         )}
         <Button title="Back to requests" onPress={onDone} />
+        <Button title="Report a problem with this trip" kind="ghost" onPress={() => router.push({ pathname: "/(app)/report", params: { rideId: ride.id } })} />
       </View>
     </Screen>
   );

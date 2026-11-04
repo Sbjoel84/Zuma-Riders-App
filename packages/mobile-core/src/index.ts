@@ -6,3 +6,4 @@ export * from "./session";
 export * from "./storage";
 export * from "./theme";
 export * from "./ui";
+export * from "./report";

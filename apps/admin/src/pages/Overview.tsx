@@ -47,7 +47,7 @@ export function Overview() {
           ].filter((a) => a.n > 0);
           return (
             <>
-              <section aria-label="Key figures" className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
+              <section aria-label="Key figures" className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
                 <Kpi label="Active trips" value={k.activeTrips} note={`${k.openRequests} request${k.openRequests === 1 ? "" : "s"} looking for drivers`} />
                 <Kpi label="Drivers online" value={k.onlineDrivers} note="Online or on a trip" />
                 <Kpi label="Completed today" value={k.completedToday} note={delta(k.completedToday, k.completedYesterday)} tone={k.completedToday >= k.completedYesterday ? "up" : "down"} />

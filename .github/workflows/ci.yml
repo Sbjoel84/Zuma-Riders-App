@@ -65,3 +65,15 @@ jobs:
           for app in passenger driver; do
             (cd apps/$app && npx expo export --platform android --output-dir /tmp/export-$app-android && npx expo export --platform ios --output-dir /tmp/export-$app-ios)
           done
+
+  admin:
+    name: Admin dashboard — typecheck and build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @zuma/contracts build
+      - run: pnpm --filter @zuma/admin build

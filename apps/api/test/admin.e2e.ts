@@ -151,6 +151,9 @@ describe("admin API", () => {
     const pax = await t.passenger("08071000005", "Price");
     const est = await t.api(pax.accessToken).post("/v1/ride-requests/estimate", { pickup: PLACES.wuse2, dropoff: PLACES.nearWuse2.lat ? PLACES.maitama : PLACES.maitama, categoryKey: "economy" }).expect(200);
     expect(BigInt(est.body.categories[0].minFare)).toBeGreaterThanOrEqual(150000n);
+
+    // Restore launch pricing so other suites (which share the database) see the seeded 15%.
+    await A.post("/v1/admin/pricing", { ...body, minFare: econ.minFare, commissionBps: econ.commissionBps, changeReason: "Restore launch pricing after test" }).expect(201);
   });
 
   it("changes service-area settings and category availability with audit entries", async () => {

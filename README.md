@@ -7,6 +7,7 @@ Fare-negotiation ride-hailing for Nigeria, launching in Abuja. The passenger off
 | API (REST + Socket.IO + jobs) | `apps/api` | NestJS 11, Prisma 7, PostgreSQL + PostGIS, Redis, BullMQ |
 | Passenger app | `apps/passenger` | Expo SDK 58, Expo Router, React Native Maps |
 | Driver app | `apps/driver` | Expo SDK 58, background location |
+| Admin dashboard | `apps/admin` | React 19, Vite, Tailwind CSS 4, TanStack Query, Recharts, Leaflet |
 | Shared | `packages/contracts`, `packages/mobile-core`, `packages/database` | Zod contracts, API/socket client + UI kit, Prisma schema and migrations |
 
 ## What works today (ride slice)
@@ -24,17 +25,25 @@ The full loop between the two apps and the API works:
    - Cash trips book the commission the driver owes.
    - Wallet trips pay the driver into a pending balance, which is released after a 24-hour hold.
 9. **Ratings** both ways, and driver earnings for the day, week or month.
-10. **Admin API** for driver and vehicle approval, suspension, and the ride list with full negotiation history. There is no admin web dashboard yet.
+10. **Admin dashboard** (web), signed in with an SMS code; each staff role only sees what it is allowed to:
+    - **Overview:** live figures, completed rides by hour and over 7 days, and a "needs attention" list.
+    - **Live map:** online drivers, open requests and trips in progress, every 5 seconds.
+    - **Rides:** search and filter; each ride shows the full negotiation, status history, route breadcrumbs and ledger entries; cancel or flag a dispute (reason required).
+    - **Drivers, Verification, Passengers:** search, suspend and reactivate; approve or reject drivers and each vehicle.
+    - **Finance:** bookings, commission, cash commission owed, wallet liabilities, a live ledger integrity check, manual driver payouts (approve → send transfer → mark paid with bank reference), audited wallet adjustments, and the ledger journal with CSV export.
+    - **Pricing:** publish a new pricing version per area and category; old versions are kept and shown in history.
+    - **Support:** tickets from both apps, replies, internal notes (hidden from customers), assignment, resolve and reopen.
+    - **Safety:** SOS alerts and safety reports with location and timeline; acknowledge, record a real contact with emergency services, resolve or mark false alarm.
+    - **Settings:** service areas (status, search radius), vehicle categories per city, admins and roles, and the audit log of actions and configuration changes.
+11. **App extras:** SOS alerts the Zuma safety team with the rider's location; "Report a problem" after any trip; the driver app has a wallet screen with earnings, bank account and withdrawal requests.
 
 **Not built yet:**
-- Admin dashboard (web)
-- Card payments and Paystack/Flutterwave wallet top-ups
-- Withdrawals
-- Document photo uploads
-- Push notifications
-- In-app chat
-- SOS alerts to emergency contacts and the ops team (the SOS screen only offers direct calls to 112 and 199, and says so)
+- Card payments, Paystack/Flutterwave wallet top-ups and automatic bank transfers (payouts are manual for now)
+- Document photo uploads (verification is done in person at the driver hub)
+- Push notifications and in-app chat
+- SMS to a rider's emergency contacts on SOS (the Zuma ops team is alerted; riders see 112 and 199 to call)
 - Promo codes and referral rewards
+- Two-factor (authenticator app) sign-in for admins: admins currently sign in with an SMS code
 
 ## Run it locally
 
@@ -52,7 +61,12 @@ pnpm db:migrate
 SEED_ADMIN_PHONE=+2348000000001 pnpm db:seed               # Abuja, categories, pricing v1, roles, an admin
 
 pnpm api:dev                              # http://localhost:4000, OTP codes print in this terminal
+
+cp apps/admin/.env.example apps/admin/.env.local
+pnpm admin                                # http://localhost:5173, sign in with 0800 000 0001
 ```
+
+To see the dashboard with realistic activity on a **local** database, run `pnpm demo-data`. It drives the real API: 11 drivers register (8 approved and online), 10 passengers book and negotiate, trips run to completion, payouts, tickets and an SOS are raised. It refuses to run against a non-local database. Add `--keepalive 30` to keep the demo drivers online for 30 minutes, or run `pnpm --filter @zuma/api demo-data --online-only 30` later to bring them back online without new activity.
 
 In development the API uses `SMS_PROVIDER=console`, so sign-in codes are printed in the API terminal. It also uses `MAPS_PROVIDER=estimate`: a list of Abuja places for search and straight-line × 1.35 for distances. The API refuses both settings when `NODE_ENV=production`.
 
@@ -69,7 +83,7 @@ npx expo run:android                          # or: npx eas build --profile deve
 To test a full trip with one computer and two phones (or one phone and an emulator):
 
 1. Driver app: sign in, complete the details and vehicle steps.
-2. `pnpm approve-driver 0803 123 4567` (the driver's number). This is a development-only stand-in for the admin dashboard.
+2. Approve the driver and their vehicle in the dashboard under **Verification** (or run `pnpm approve-driver 0803 123 4567`).
 3. Driver app: **Go online** from somewhere inside Abuja. In an emulator, set the GPS location to Wuse 2 (9.0765, 7.4790).
 4. Passenger app: sign in, search "Jabi" or "Airport", pick a fare and tap **Find drivers**.
 5. Driver: accept or counter. Passenger: accept the offer, read out the PIN. Driver: arrived → enter PIN → complete.
@@ -77,7 +91,7 @@ To test a full trip with one computer and two phones (or one phone and an emulat
 ## Tests
 
 ```bash
-pnpm api:test        # 24 tests against real Postgres+PostGIS and Redis (uses the zuma_test database)
+pnpm api:test        # 35 tests against real Postgres+PostGIS and Redis (uses the zuma_test database)
 ```
 
 The tests cover:
@@ -87,9 +101,11 @@ The tests cover:
 - 10 concurrent accepts producing exactly one ride, and two passengers accepting the same driver at the same moment;
 - duplicate submits, refresh-token reuse, request expiry, and unverified drivers being blocked;
 - wallet settlement and the pending → available release;
-- place search.
+- place search;
+- every admin flow: metrics, live map, suspensions, verification, payouts through the ledger, pricing versions, area and category changes, the support desk, the SOS escalation rules, and role permissions;
+- sign-in rate limits.
 
-CI (`.github/workflows/ci.yml`) runs the API tests with PostGIS and Redis service containers, and typechecks and bundles both apps for Android and iOS.
+CI (`.github/workflows/ci.yml`) runs the API tests with PostGIS and Redis service containers, typechecks and bundles both apps for Android and iOS, and builds the admin dashboard.
 
 ## Docs
 

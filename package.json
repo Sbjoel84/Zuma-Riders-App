@@ -17,7 +17,9 @@
     "api:test": "pnpm --filter @zuma/api test",
     "passenger": "pnpm --filter @zuma/passenger start",
     "driver": "pnpm --filter @zuma/driver start",
-    "approve-driver": "pnpm --filter @zuma/api approve-driver"
+    "approve-driver": "pnpm --filter @zuma/api approve-driver",
+    "admin": "pnpm --filter @zuma/admin dev",
+    "demo-data": "pnpm --filter @zuma/api demo-data"
   },
   "devDependencies": {
     "turbo": "^2.3.0",

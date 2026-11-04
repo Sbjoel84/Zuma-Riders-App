@@ -110,10 +110,10 @@ export default function Home() {
             <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: online ? "#fff" : colors.nightMuted }} />
             <Txt variant="label" color="#fff">{toggling ? "…" : online ? "Online" : "Offline"}</Txt>
           </Pressable>
-          <View style={{ alignItems: "flex-end" }}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Open wallet and earnings" onPress={() => router.push("/(app)/wallet")} style={{ alignItems: "flex-end" }}>
             <Txt variant="title">{naira(earnings.data?.net ?? "0")}</Txt>
-            <Muted>Today · {earnings.data?.trips ?? 0} trips · ★ {driver.data?.ratingAvg ?? "—"}</Muted>
-          </View>
+            <Muted>Today · {earnings.data?.trips ?? 0} trips · ★ {driver.data?.ratingAvg ?? "—"} · Wallet ›</Muted>
+          </Pressable>
         </Row>
 
         {error ? <Banner text={error} /> : null}
@@ -128,6 +128,8 @@ export default function Home() {
             <Txt variant="display" center>You're offline</Txt>
             <Muted variant="body" center>Go online to receive ride requests near you. You choose which trips to take and at what price.</Muted>
             <Button title="Go online" kind="amber" onPress={toggle} loading={toggling} />
+            <Button title="Wallet and earnings" kind="secondary" onPress={() => router.push("/(app)/wallet")} />
+            <Button title="Help and support" kind="ghost" onPress={() => router.push("/(app)/report")} />
             <Button title="Sign out" kind="ghost" onPress={signOut} />
           </View>
         ) : (
