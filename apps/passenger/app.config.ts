@@ -8,7 +8,6 @@ const config: ExpoConfig = {
   orientation: "portrait",
   icon: "./assets/icon.png",
   userInterfaceStyle: "light",
-  splash: { image: "./assets/splash-icon.png", resizeMode: "contain", backgroundColor: "#12161b" },
   ios: {
     bundleIdentifier: "com.zuma.passenger",
     supportsTablet: false,
@@ -25,6 +24,7 @@ const config: ExpoConfig = {
   plugins: [
     "expo-router",
     "expo-secure-store",
+    ["expo-splash-screen", { image: "./assets/splash-icon.png", imageWidth: 160, resizeMode: "contain", backgroundColor: "#12161b" }],
     ["expo-location", { locationWhenInUsePermission: "Zuma uses your location to set your pickup point and show nearby drivers." }],
   ],
   experiments: { typedRoutes: false },

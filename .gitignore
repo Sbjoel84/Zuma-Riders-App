@@ -7,3 +7,7 @@ packages/database/src/generated
 packages/*/dist
 apps/*/dist
 .env
+dist-check
+.expo
+android
+ios
