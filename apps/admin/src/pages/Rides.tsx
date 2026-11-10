@@ -94,6 +94,9 @@ interface RideDetailData {
   pickup: { address: string; lat: number; lng: number }; dropoff: { address: string; lat: number; lng: number };
   distanceM: number; durationS: number; suggestedFare: string; proposedFare: string; agreedFare: string; finalFare: string | null; commission: string | null; commissionBps: number;
   paymentMethod: string; pinAttempts: number;
+  discount: string; promoCode: string | null;
+  payments: { reference: string; method: string; status: string; amount: string; fee: string; card: string | null; failureReason: string | null }[];
+  chat: { id: string; from: string; body: string | null; imageUrl: string | null; flagged: boolean; at: string }[];
   times: Record<string, string | null>;
   cancellation: { by: string; reason: string; text: string | null; fee: string } | null;
   ratings: { by: string; stars: number; comment: string | null }[];
@@ -149,8 +152,15 @@ function RideDetail({ id }: { id: string }) {
                 <Info k="From" v={r.pickup.address} />
                 <Info k="To" v={r.dropoff.address} />
                 <Info k="Fare" v={`${naira(r.proposedFare)} proposed → ${naira(r.agreedFare)} agreed`} sub={`Suggested ${naira(r.suggestedFare)}${r.finalFare ? ` · final ${naira(r.finalFare)}` : ""}`} />
-                <Info k="Payment" v={titleCase(r.paymentMethod)} sub={r.commission ? `Commission ${naira(r.commission)} (${r.commissionBps / 100}%)` : `Commission rate ${r.commissionBps / 100}%`} />
+                <Info k="Payment" v={`${titleCase(r.paymentMethod)}${r.payments.find((p) => p.card && p.status === "SUCCEEDED") ? ` · ${r.payments.find((p) => p.card && p.status === "SUCCEEDED")!.card}` : ""}`} sub={r.commission ? `Commission ${naira(r.commission)} (${r.commissionBps / 100}%)` : `Commission rate ${r.commissionBps / 100}%`} />
+                {BigInt(r.discount) > 0n ? <Info k="Promo" v={`${r.promoCode ?? "Promo"} · ${naira(r.discount)} off`} sub="Paid by Zuma. The driver earns on the full agreed fare." /> : null}
               </dl>
+
+              {r.payments.some((p) => p.status === "FAILED") ? (
+                <p className="rounded-[10px] bg-amber-soft px-3 py-2 text-sm text-amber-text">
+                  Card charge failed{r.payments.find((p) => p.status === "FAILED")?.failureReason ? ` (${r.payments.find((p) => p.status === "FAILED")!.failureReason})` : ""}. The trip was settled {r.paymentMethod === "WALLET" ? "from the wallet" : "in cash"}.
+                </p>
+              ) : null}
 
               {r.cancellation ? (
                 <p className="rounded-[10px] bg-bad-soft px-3 py-2 text-sm text-bad-text">
@@ -184,6 +194,20 @@ function RideDetail({ id }: { id: string }) {
                   ))}
                 </ol>
               </section>
+
+              {r.chat.length ? (
+                <section>
+                  <h3 className="mb-2 text-xs font-bold tracking-wide text-muted uppercase">Chat ({r.chat.length})</h3>
+                  <ol className="flex flex-col gap-1.5">
+                    {r.chat.map((m) => (
+                      <li key={m.id} className={`max-w-[85%] rounded-[12px] px-3 py-2 text-sm ${m.from === "PASSENGER" ? "self-start bg-[#f1f3ee]" : "self-end bg-ink text-white"}`}>
+                        <span className={`block text-[11px] ${m.from === "PASSENGER" ? "text-muted" : "text-[#c9cec7]"}`}>{m.from === "PASSENGER" ? r.passenger.name.split(" ")[0] : r.driver.name.split(" ")[0]} · {time(m.at)}{m.flagged ? " · contains a phone number" : ""}</span>
+                        {m.imageUrl ? <a href={m.imageUrl} target="_blank" rel="noreferrer" className="underline">Photo</a> : m.body}
+                      </li>
+                    ))}
+                  </ol>
+                </section>
+              ) : null}
 
               {r.ratings.length ? (
                 <section>

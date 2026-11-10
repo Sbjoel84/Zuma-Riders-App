@@ -21,6 +21,8 @@ const Safety = lazy(() => import("./pages/Safety").then((m) => ({ default: m.Saf
 const Settings = lazy(() => import("./pages/Settings").then((m) => ({ default: m.Settings })));
 const Support = lazy(() => import("./pages/Support").then((m) => ({ default: m.Support })));
 const Verification = lazy(() => import("./pages/Verification").then((m) => ({ default: m.Verification })));
+const Promotions = lazy(() => import("./pages/Promotions").then((m) => ({ default: m.Promotions })));
+const Security = lazy(() => import("./pages/Security").then((m) => ({ default: m.Security })));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -36,6 +38,7 @@ function Gate() {
   const { status } = useAuth();
   if (status === "loading") return <Spinner label="Signing you in…" />;
   if (status === "signedOut") return <Login />;
+  if (status === "mfaSetup") return <Suspense fallback={<Spinner />}><Security enrolOnly /></Suspense>;
   return (
     <Suspense fallback={<Spinner />}>
     <Routes>
@@ -52,7 +55,9 @@ function Gate() {
         <Route path="support" element={<Support />} />
         <Route path="support/:id" element={<Support />} />
         <Route path="safety" element={<Safety />} />
+        <Route path="promotions" element={<Promotions />} />
         <Route path="settings" element={<Settings />} />
+        <Route path="security" element={<Security />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

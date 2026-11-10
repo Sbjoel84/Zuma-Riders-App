@@ -52,6 +52,24 @@ export const WITHDRAWAL_STATUS: Record<string, { label: string; tone: Tone }> = 
   COMPLETED: { label: "Paid", tone: "green" },
   REJECTED: { label: "Rejected", tone: "red" },
   FAILED: { label: "Failed", tone: "red" },
-  PROCESSING: { label: "Processing", tone: "blue" },
+  PROCESSING: { label: "Sending via Paystack", tone: "blue" },
   CANCELLED: { label: "Cancelled", tone: "neutral" },
+};
+
+export const PAYMENT_STATUS: Record<string, { label: string; tone: Tone }> = {
+  INITIATED: { label: "Started", tone: "neutral" },
+  PENDING: { label: "Waiting for customer", tone: "amber" },
+  SUCCEEDED: { label: "Paid", tone: "green" },
+  FAILED: { label: "Failed", tone: "red" },
+  ABANDONED: { label: "Abandoned", tone: "neutral" },
+  REVERSED: { label: "Reversed", tone: "red" },
+  REFUNDED: { label: "Refunded", tone: "violet" },
+  PARTIALLY_REFUNDED: { label: "Part refunded", tone: "violet" },
+};
+
+export const PAYMENT_PURPOSE: Record<string, string> = {
+  RIDE_FARE: "Card trip",
+  WALLET_TOPUP: "Wallet top-up",
+  COMMISSION_SETTLEMENT: "Driver commission payment",
+  CANCELLATION_FEE: "Cancellation fee",
 };

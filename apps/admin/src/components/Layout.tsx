@@ -24,6 +24,7 @@ const NAV: { to: string; label: string; perm: string; badge?: keyof Attention; u
   { to: "/passengers", label: "Passengers", perm: "passengers:read" },
   { to: "/finance", label: "Finance", perm: "finance:read", badge: "pendingWithdrawals" },
   { to: "/pricing", label: "Pricing", perm: "dashboard:read" },
+  { to: "/promotions", label: "Promotions", perm: "marketing:write" },
   { to: "/support", label: "Support", perm: "support:write", badge: "openTickets" },
   { to: "/safety", label: "Safety", perm: "safety:write", badge: "openIncidents", urgent: true },
   { to: "/settings", label: "Settings", perm: "dashboard:read" },
@@ -76,7 +77,10 @@ export function Layout() {
             <br />
             {me?.roles.map((r) => r.name).join(", ")}
           </span>
-          <button onClick={signOut} className="cursor-pointer self-start font-semibold text-[#f1f3ee] underline">Sign out</button>
+          <span className="flex gap-3">
+            <NavLink to="/security" className="font-semibold text-[#f1f3ee] underline">Security</NavLink>
+            <button onClick={signOut} className="cursor-pointer font-semibold text-[#f1f3ee] underline">Sign out</button>
+          </span>
         </div>
       </aside>
       {open ? <div className="fixed inset-0 z-30 bg-ink/40 lg:hidden" onClick={() => setOpen(false)} /> : null}

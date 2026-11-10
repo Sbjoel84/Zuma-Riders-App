@@ -160,7 +160,7 @@ export function Async<T>({ q, children, loading }: { q: { isLoading: boolean; is
 
 // ---------------- dialog ----------------
 
-export function Dialog({ open, onClose, title, children, footer }: { open: boolean; onClose: () => void; title: string; children: ReactNode; footer?: ReactNode }) {
+export function Dialog({ open, onClose, title, children, footer, wide }: { open: boolean; onClose: () => void; title: string; children: ReactNode; footer?: ReactNode; wide?: boolean }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const d = ref.current;
@@ -169,8 +169,8 @@ export function Dialog({ open, onClose, title, children, footer }: { open: boole
     if (!open && d.open) d.close();
   }, [open]);
   return (
-    <dialog ref={ref} onClose={onClose} onCancel={onClose} className="m-auto w-[min(520px,calc(100vw-32px))] rounded-[16px] border-0 p-0 shadow-2xl backdrop:bg-ink/50">
-      <div className="flex items-center justify-between border-b border-line-soft px-5 py-4">
+    <dialog ref={ref} onClose={onClose} onCancel={onClose} className={clsx("m-auto max-h-[calc(100vh-32px)] rounded-[16px] border-0 p-0 shadow-2xl backdrop:bg-ink/50", wide ? "w-[min(1080px,calc(100vw-32px))]" : "w-[min(520px,calc(100vw-32px))]")}>
+      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-line-soft bg-white px-5 py-4">
         <h2 className="font-display text-lg font-bold">{title}</h2>
         <button onClick={onClose} aria-label="Close" className="cursor-pointer rounded-md p-1 text-muted hover:text-ink">
           <X className="size-5" />

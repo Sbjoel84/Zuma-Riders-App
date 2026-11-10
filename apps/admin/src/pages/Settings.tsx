@@ -140,7 +140,7 @@ function Categories() {
   );
 }
 
-interface AdminsData { admins: { id: string; userId: string; name: string; phone: string; status: string; roles: { key: string; name: string }[]; lastLoginAt: string | null; createdAt: string }[]; roles: { key: string; name: string; permissions: string[] }[] }
+interface AdminsData { admins: { id: string; userId: string; name: string; phone: string; status: string; roles: { key: string; name: string }[]; lastLoginAt: string | null; createdAt: string; twoFactor: boolean }[]; roles: { key: string; name: string; permissions: string[] }[] }
 
 function Admins() {
   const qc = useQueryClient();
@@ -175,7 +175,7 @@ function Admins() {
       {(d) => (
         <>
           <Card title="Admins" pad={false} actions={<Button kind="primary" size="sm" onClick={() => setInvite(true)}>Add admin</Button>}>
-            <Table head={["Admin", "Role", "Last sign-in", "Added", ""]} minWidth={760}>
+            <Table head={["Admin", "Role", "Two-factor", "Last sign-in", "Added", ""]} minWidth={860}>
               {d.admins.map((a) => {
                 const self = a.userId === me?.id;
                 const revoked = a.roles.length === 0;
@@ -191,6 +191,12 @@ function Admins() {
                           {d.roles.map((r) => <option key={r.key} value={r.key}>{r.name}</option>)}
                         </Select>
                       )}
+                    </Td>
+                    <Td>
+                      {a.twoFactor ? <Badge tone="green">On</Badge> : <Badge tone="amber">Off</Badge>}
+                      {a.twoFactor && !self && !revoked ? (
+                        <button className="ml-2 cursor-pointer text-xs font-semibold underline" onClick={() => confirm({ title: `Reset ${a.name}'s two-factor?`, body: "Use this when they've lost their phone. Check who they are first. They're signed out and must set up the authenticator app again.", reason: true, danger: true, confirmLabel: "Reset two-factor", success: "Two-factor reset.", run: async (reason) => { await api.post(`/v1/admin/admins/${a.userId}/reset-2fa`, { reason }); refresh(); } })}>Reset</button>
+                      ) : null}
                     </Td>
                     <Td className="text-muted">{a.lastLoginAt ? dateTime(a.lastLoginAt) : "Never"}</Td>
                     <Td className="text-muted">{dateTime(a.createdAt)}</Td>

@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
-import { api, session } from "./api";
+import { api, ApiError, session } from "./api";
 
 export interface AdminMe {
   id: string;
@@ -11,11 +11,15 @@ export interface AdminMe {
 }
 
 interface AuthState {
-  status: "loading" | "signedOut" | "signedIn";
+  /** mfaSetup: signed in, but must enrol an authenticator app before using the console. */
+  status: "loading" | "signedOut" | "signedIn" | "mfaSetup";
   me: AdminMe | null;
   can: (permission: string) => boolean;
   requestCode: (phone: string) => Promise<string>;
-  verifyCode: (otpId: string, code: string) => Promise<void>;
+  /** Returns an MFA ticket when the account has an authenticator app; otherwise signs in. */
+  verifyCode: (otpId: string, code: string) => Promise<{ mfaToken: string } | null>;
+  verifyMfa: (mfaToken: string, code: string) => Promise<void>;
+  reload: () => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -40,9 +44,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [me, setMe] = useState<AdminMe | null>(null);
 
   const loadMe = useCallback(async () => {
-    const m = await api.get<AdminMe>("/v1/admin/me");
-    setMe(m);
-    setStatus("signedIn");
+    try {
+      const m = await api.get<AdminMe>("/v1/admin/me");
+      setMe(m);
+      setStatus("signedIn");
+    } catch (e) {
+      if (e instanceof ApiError && e.code === "MFA_SETUP_REQUIRED") {
+        setMe(null);
+        setStatus("mfaSetup");
+        return;
+      }
+      throw e;
+    }
   }, []);
 
   useEffect(() => {
@@ -66,10 +79,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     can: (p) => !!me?.permissions.includes(p),
     requestCode: async (phone) => (await api.publicPost<{ otpId: string }>("/v1/auth/otp/request", { phone, appScope: "ADMIN" })).otpId,
     verifyCode: async (otpId, code) => {
-      const t = await api.publicPost<{ accessToken: string; refreshToken: string }>("/v1/auth/otp/verify", { otpId, code, appScope: "ADMIN", device: { installId: installId(), platform: "WEB", model: navigator.userAgent.slice(0, 90) } });
+      const t = await api.publicPost<{ accessToken?: string; refreshToken?: string; mfaRequired?: boolean; mfaToken?: string }>("/v1/auth/otp/verify", { otpId, code, appScope: "ADMIN", device: { installId: installId(), platform: "WEB", model: navigator.userAgent.slice(0, 90) } });
+      if (t.mfaRequired && t.mfaToken) return { mfaToken: t.mfaToken };
+      session.set(t.accessToken!, t.refreshToken!);
+      await loadMe();
+      return null;
+    },
+    verifyMfa: async (mfaToken, code) => {
+      const t = await api.publicPost<{ accessToken: string; refreshToken: string }>("/v1/auth/mfa/verify", { mfaToken, code });
       session.set(t.accessToken, t.refreshToken);
       await loadMe();
     },
+    reload: loadMe,
     signOut: async () => {
       await api.post("/v1/auth/logout").catch(() => undefined);
       session.clear();

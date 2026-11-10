@@ -1,18 +1,22 @@
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { Link } from "react-router";
 import { Async, Badge, Button, Card, Chips, Empty, ErrorBox, Field, Input, Kpi, PageHeader, Select, Table, Td, Textarea, useConfirm, useToast } from "../components/ui";
 import { api, errorText } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { ago, dateTime, naira, titleCase, toKobo } from "../lib/format";
-import { WITHDRAWAL_STATUS } from "../lib/status";
+import { PAYMENT_PURPOSE, PAYMENT_STATUS, WITHDRAWAL_STATUS } from "../lib/status";
 
 interface Summary {
-  days: number; trips: number; gross: string; cashGross: string; walletGross: string; commission: string; cancellationFees: string;
+  days: number; trips: number; gross: string; cashGross: string; walletGross: string; cardGross: string; commission: string; cancellationFees: string;
+  promoSpend: string; cardTopups: { count: number; amount: string }; providerFees: string;
   passengerLiability: string; driverLiability: string; cashCommissionOwed: string; driversOwing: number;
   pendingWithdrawals: { count: number; amount: string };
   integrity: { unbalancedTransactions: number; walletsOutOfSync: number };
 }
-interface Withdrawal { id: string; driver: string; phone: string; amount: string; bank: string; status: string; rejectionReason: string | null; bankReference: string | null; approvedBy: string | null; createdAt: string; completedAt: string | null }
+interface Withdrawal { id: string; driver: string; phone: string; amount: string; bank: string; status: string; rejectionReason: string | null; bankReference: string | null; approvedBy: string | null; createdAt: string; completedAt: string | null; automatic: boolean }
+interface PaymentRow { id: string; reference: string; purpose: string; status: string; amount: string; fee: string; user: string; phone: string; card: string | null; ride: { id: string; code: string } | null; failureReason: string | null; createdAt: string; verifiedAt: string | null }
+interface Hook { id: string; eventType: string; status: string; signatureValid: boolean; error: string | null; reference: string | null; receivedAt: string }
 interface Txn { id: string; type: string; description: string; postedAt: string; entries: { account: string; code: string; direction: string; amount: string }[] }
 
 export function Finance() {
@@ -31,12 +35,13 @@ export function Finance() {
             ) : (
               <p className="flex items-center gap-2 text-sm text-ok-text"><span className="size-2 rounded-full bg-ok" />Ledger check passed: every transaction balances and every wallet matches its ledger.</p>
             )}
-            <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
-              <Kpi label="Gross bookings" value={naira(s.gross, { compact: true })} note={`${s.trips} trips · cash ${naira(s.cashGross, { compact: true })} · wallet ${naira(s.walletGross, { compact: true })}`} />
+            <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+              <Kpi label="Gross bookings" value={naira(s.gross, { compact: true })} note={`${s.trips} trips · cash ${naira(s.cashGross, { compact: true })} · wallet ${naira(s.walletGross, { compact: true })} · card ${naira(s.cardGross, { compact: true })}`} />
               <Kpi label="Platform commission" value={naira(s.commission, { compact: true })} note={BigInt(s.cancellationFees) > 0n ? `+ ${naira(s.cancellationFees)} cancellation fees` : "Booked when trips complete"} />
               <Kpi label="Cash commission owed" value={naira(s.cashCommissionOwed, { compact: true })} note={`${s.driversOwing} driver(s) below zero`} tone={s.driversOwing ? "down" : "muted"} />
               <Kpi label="Wallet liabilities" value={naira((BigInt(s.passengerLiability) + BigInt(s.driverLiability)).toString(), { compact: true })} note={`Passengers ${naira(s.passengerLiability, { compact: true })} · drivers ${naira(s.driverLiability, { compact: true })}`} />
               <Kpi label="Payouts waiting" value={s.pendingWithdrawals.count} note={naira(s.pendingWithdrawals.amount)} />
+              <Kpi label="Card money in" value={naira(s.cardTopups.amount, { compact: true })} note={`${s.cardTopups.count} top-up(s) · Paystack fees ${naira(s.providerFees)} · promos ${naira(s.promoSpend)}`} />
             </section>
           </>
         )}
@@ -45,16 +50,77 @@ export function Finance() {
         <Withdrawals canPay={can("finance:payout")} />
         {can("finance:adjust") ? <Adjust /> : null}
       </div>
+      <Payments />
       <Journal />
     </>
+  );
+}
+
+function Payments() {
+  const [tab, setTab] = useState("payments");
+  const [status, setStatus] = useState("");
+  const pays = useQuery({ queryKey: ["payments", status], queryFn: () => api.get<{ data: PaymentRow[] }>(`/v1/admin/finance/payments${status ? `?status=${status}` : ""}`), enabled: tab === "payments", refetchInterval: 30_000 });
+  const hooks = useQuery({ queryKey: ["webhooks"], queryFn: () => api.get<Hook[]>("/v1/admin/finance/webhooks"), enabled: tab === "webhooks", refetchInterval: 30_000 });
+  return (
+    <Card
+      title="Card payments (Paystack)"
+      pad={false}
+      actions={<Chips label="View" value={tab} onChange={setTab} options={[{ value: "payments", label: "Payments" }, { value: "webhooks", label: "Webhook log" }]} />}
+    >
+      {tab === "payments" ? (
+        <>
+          <div className="flex flex-wrap items-center gap-2 px-[18px] pb-3">
+            <Chips label="Payment status" value={status} onChange={setStatus} options={[{ value: "", label: "All" }, { value: "SUCCEEDED", label: "Paid" }, { value: "FAILED", label: "Failed" }, { value: "PENDING", label: "Waiting" }]} />
+          </div>
+          <Async q={pays}>
+            {(p) =>
+              p.data.length === 0 ? <Empty title="No card payments yet" body="Top-ups, card trips and driver commission payments appear here." /> : (
+                <Table head={["When", "Customer", "What", "Card", "Amount", "Fee", "Status"]} minWidth={860}>
+                  {p.data.map((x) => (
+                    <tr key={x.id}>
+                      <Td className="text-muted">{dateTime(x.createdAt)}</Td>
+                      <Td><span className="font-semibold">{x.user}</span><div className="text-xs text-muted">{x.phone}</div></Td>
+                      <Td>{PAYMENT_PURPOSE[x.purpose] ?? titleCase(x.purpose)}{x.ride ? <div className="text-xs"><Link className="underline" to={`/rides/${x.ride.id}`}>{x.ride.code}</Link></div> : null}<div className="text-xs text-muted">{x.reference}</div></Td>
+                      <Td className="text-[13px]">{x.card ?? "—"}</Td>
+                      <Td className="tabular font-semibold">{naira(x.amount)}</Td>
+                      <Td className="tabular text-muted">{BigInt(x.fee) > 0n ? naira(x.fee) : "—"}</Td>
+                      <Td><Badge tone={PAYMENT_STATUS[x.status]?.tone}>{PAYMENT_STATUS[x.status]?.label ?? x.status}</Badge>{x.failureReason ? <div className="mt-1 max-w-[220px] text-xs text-muted">{x.failureReason}</div> : null}</Td>
+                    </tr>
+                  ))}
+                </Table>
+              )
+            }
+          </Async>
+        </>
+      ) : (
+        <Async q={hooks}>
+          {(h) =>
+            h.length === 0 ? <Empty title="No webhooks received yet" body="Paystack calls the API at /v1/webhooks/paystack when payments and transfers finish." /> : (
+              <Table head={["Received", "Event", "Reference", "Signature", "Result"]} minWidth={720}>
+                {h.map((x) => (
+                  <tr key={x.id}>
+                    <Td className="text-muted">{dateTime(x.receivedAt)}</Td>
+                    <Td className="font-semibold">{x.eventType}</Td>
+                    <Td className="text-[13px]">{x.reference ?? "—"}</Td>
+                    <Td>{x.signatureValid ? <Badge tone="green">Valid</Badge> : <Badge tone="red">Invalid</Badge>}</Td>
+                    <Td><Badge tone={x.status === "PROCESSED" ? "green" : x.status === "FAILED" || x.status === "SIGNATURE_INVALID" ? "red" : "neutral"}>{titleCase(x.status)}</Badge>{x.error ? <div className="mt-1 text-xs text-bad">{x.error}</div> : null}</Td>
+                  </tr>
+                ))}
+              </Table>
+            )
+          }
+        </Async>
+      )}
+    </Card>
   );
 }
 
 function Withdrawals({ canPay }: { canPay: boolean }) {
   const qc = useQueryClient();
   const confirm = useConfirm();
+  const toast = useToast();
   const [filter, setFilter] = useState("open");
-  const q = useQuery({ queryKey: ["withdrawals", filter], queryFn: () => api.get<Withdrawal[]>(`/v1/admin/finance/withdrawals${filter === "all" ? "" : `?status=${filter}`}`), refetchInterval: 30_000 });
+  const q = useQuery({ queryKey: ["withdrawals", filter], queryFn: () => api.get<Withdrawal[]>(`/v1/admin/finance/withdrawals${filter === "all" ? "" : `?status=${filter}`}`), refetchInterval: (query) => ((query.state.data as Withdrawal[] | undefined)?.some((w) => w.status === "PROCESSING") ? 3_000 : 30_000) });
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["withdrawals"] });
     qc.invalidateQueries({ queryKey: ["finance"] });
@@ -63,8 +129,8 @@ function Withdrawals({ canPay }: { canPay: boolean }) {
   };
 
   return (
-    <Card title="Driver payouts" actions={<Chips label="Payout status" value={filter} onChange={setFilter} options={[{ value: "open", label: "To do" }, { value: "COMPLETED", label: "Paid" }, { value: "REJECTED", label: "Rejected" }, { value: "all", label: "All" }]} />}>
-      <p className="mb-3 text-xs text-muted">Payouts are manual until bank transfers are connected: approve, send the transfer from the company account, then record it as paid with the bank reference.</p>
+    <Card title="Driver payouts" actions={<Chips label="Payout status" value={filter} onChange={setFilter} options={[{ value: "open", label: "To do" }, { value: "COMPLETED", label: "Paid" }, { value: "FAILED", label: "Failed" }, { value: "REJECTED", label: "Rejected" }, { value: "all", label: "All" }]} />}>
+      <p className="mb-3 text-xs text-muted">Drivers with a bank account verified through Paystack are paid automatically when you approve: Zuma sends the transfer and marks it paid when the bank confirms. Older accounts marked "manual" need a transfer from the company account, then "Mark as paid".</p>
       <Async q={q}>
         {(list) =>
           list.length === 0 ? (
@@ -74,24 +140,36 @@ function Withdrawals({ canPay }: { canPay: boolean }) {
               {list.map((w) => (
                 <li key={w.id} className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] bg-[#f8f9f6] px-3 py-2.5">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold">{w.driver} · <span className="tabular">{naira(w.amount)}</span></p>
+                    <p className="text-sm font-semibold">{w.driver} · <span className="tabular">{naira(w.amount)}</span> <span className="ml-1 align-middle"><Badge tone={w.automatic ? "green" : "neutral"}>{w.automatic ? "Paystack transfer" : "Manual"}</Badge></span></p>
                     <p className="text-xs text-muted">{w.bank} · {w.phone} · requested {ago(w.createdAt)}{w.bankReference ? ` · ref ${w.bankReference}` : ""}{w.rejectionReason ? ` · ${w.rejectionReason}` : ""}</p>
                   </div>
                   <div className="flex items-center gap-1.5">
                     {canPay && w.status === "REQUESTED" ? (
                       <>
                         <Button size="sm" kind="danger" onClick={() => confirm({ title: `Reject ${naira(w.amount)} for ${w.driver}?`, body: "The money goes back to their available balance.", reason: true, danger: true, confirmLabel: "Reject payout", success: `Payout rejected. ${naira(w.amount)} returned to ${w.driver}'s balance.`, run: async (reason) => { await api.post(`/v1/admin/finance/withdrawals/${w.id}/reject`, { reason }); refresh(); } })}>Reject</Button>
-                        <Button size="sm" kind="primary" onClick={() => confirm({ title: `Approve ${naira(w.amount)} for ${w.driver}?`, body: `Next, transfer ${naira(w.amount)} to ${w.bank}, then record it as paid.`, confirmLabel: "Approve payout", success: "Payout approved. Send the bank transfer, then mark it paid.", run: async () => { await api.post(`/v1/admin/finance/withdrawals/${w.id}/approve`); refresh(); } })}>Approve payout</Button>
+                        <Button size="sm" kind="primary" onClick={() => confirm({
+                          title: `Approve ${naira(w.amount)} for ${w.driver}?`,
+                          body: w.automatic ? `Zuma sends ${naira(w.amount)} to ${w.bank} through Paystack straight away.` : `Next, transfer ${naira(w.amount)} to ${w.bank}, then record it as paid.`,
+                          confirmLabel: w.automatic ? "Approve and send" : "Approve payout",
+                          run: async () => {
+                            const r = await api.post<{ status: string; message?: string }>(`/v1/admin/finance/withdrawals/${w.id}/approve`);
+                            refresh();
+                            toast(r.message ?? (w.automatic ? `Transfer of ${naira(w.amount)} sent to ${w.bank}. It's marked paid when the bank confirms.` : "Payout approved. Send the bank transfer, then mark it paid."), r.message ? "bad" : "ok");
+                          },
+                        })}>{w.automatic ? "Approve and send" : "Approve payout"}</Button>
                       </>
                     ) : canPay && w.status === "APPROVED" ? (
                       <>
                         <Button size="sm" kind="danger" onClick={() => confirm({ title: "Cancel this approved payout?", body: "Only do this if the transfer was not sent.", reason: true, danger: true, confirmLabel: "Reject payout", success: "Payout rejected and returned to the driver's balance.", run: async (reason) => { await api.post(`/v1/admin/finance/withdrawals/${w.id}/reject`, { reason }); refresh(); } })}>Reject</Button>
+                        {w.automatic ? (
+                          <Button size="sm" kind="primary" onClick={() => confirm({ title: "Retry the Paystack transfer?", body: `Paystack refused the last attempt. Retry sending ${naira(w.amount)} to ${w.bank}.`, confirmLabel: "Retry transfer", run: async () => { const r = await api.post<{ status: string; message?: string }>(`/v1/admin/finance/withdrawals/${w.id}/send`); refresh(); toast(r.message ?? "Transfer sent.", r.message ? "bad" : "ok"); } })}>Retry transfer</Button>
+                        ) : null}
                         <Button size="sm" kind="amber" onClick={() => confirm({ title: `Record ${naira(w.amount)} as paid`, body: `Enter the reference of the transfer you sent to ${w.bank}.`, reason: true, reasonLabel: "Bank transfer reference", confirmLabel: "Mark as paid", success: `Payout to ${w.driver} recorded as paid.`, run: async (ref) => { await api.post(`/v1/admin/finance/withdrawals/${w.id}/paid`, { bankReference: ref }); refresh(); } })}>Mark as paid</Button>
                       </>
                     ) : (
                       <Badge tone={WITHDRAWAL_STATUS[w.status]?.tone}>{WITHDRAWAL_STATUS[w.status]?.label ?? w.status}</Badge>
                     )}
-                    {w.status === "APPROVED" ? <Badge tone="blue">Awaiting transfer</Badge> : null}
+                    {w.status === "APPROVED" && !w.automatic ? <Badge tone="blue">Awaiting transfer</Badge> : null}
                   </div>
                 </li>
               ))}
