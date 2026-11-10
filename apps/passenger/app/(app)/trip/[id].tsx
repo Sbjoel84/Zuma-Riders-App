@@ -3,7 +3,7 @@ import type { RideView } from "@zuma/contracts";
 import { api, Banner, Button, Card, colors, errorMessage, km, Loading, Muted, naira, Pill, radius, Row, Screen, space, Txt, useRealtimeConnected, useServerEvent } from "@zuma/mobile-core";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, Share, StyleSheet, View } from "react-native";
 import MapView, { Marker } from "react-native-maps";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useBooking } from "../../../src/booking";
@@ -26,6 +26,7 @@ export default function Trip() {
   const [driverPos, setDriverPos] = useState<{ lat: number; lng: number } | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [shared, setShared] = useState<string | null>(null);
   const map = useRef<MapView>(null);
 
   const ride = useQuery({
@@ -44,6 +45,9 @@ export default function Trip() {
   useServerEvent<{ rideId: string; status: string }>("ride.status", (e) => {
     if (e.rideId === id) qc.invalidateQueries({ queryKey: ["ride", id] });
   });
+  useServerEvent<{ rideId: string; message: { fromMe: boolean } }>("chat.message", (e) => {
+    if (e.rideId === id && !e.message.fromMe) qc.invalidateQueries({ queryKey: ["ride", id] });
+  });
 
   useEffect(() => {
     const r = ride.data;
@@ -61,6 +65,17 @@ export default function Trip() {
   if (r.status === "TRIP_COMPLETED" || r.status === "CANCELLED") {
     return <TripEnded ride={r} onDone={() => { resetBooking(); qc.invalidateQueries({ queryKey: ["current"] }); qc.invalidateQueries({ queryKey: ["wallet"] }); router.replace("/(app)/home"); }} />;
   }
+
+  const shareTrip = async () => {
+    setError(null);
+    try {
+      const r = await api.post<{ url: string; contactsNotified: number }>(`/v1/rides/${id}/share`, { notifyContacts: true });
+      setShared(r.contactsNotified ? `Texted a live link to ${r.contactsNotified} emergency contact${r.contactsNotified > 1 ? "s" : ""}.` : "Link ready.");
+      await Share.share({ message: `Follow my Zuma trip live: ${r.url}` });
+    } catch (e) {
+      setError(errorMessage(e));
+    }
+  };
 
   const cancel = async () => {
     setError(null);
@@ -129,14 +144,21 @@ export default function Trip() {
 
           {r.status === "DRIVER_ARRIVED" ? <Banner tone="green" text={`${r.driver.firstName} is waiting at the pickup point.`} /> : null}
 
+          <Row gap={space.sm}>
+            <Button title={r.unreadMessages ? `Message · ${r.unreadMessages} new` : `Message ${r.driver.firstName}`} kind={r.unreadMessages ? "amber" : "secondary"} style={{ flex: 1 }} onPress={() => router.push({ pathname: "/(app)/chat/[id]", params: { id } })} />
+            <Button title="Share trip" kind="secondary" style={{ flex: 1 }} onPress={shareTrip} />
+          </Row>
+          {shared ? <Muted>{shared}</Muted> : null}
+
           <Card style={{ padding: space.md }}>
             <Row style={{ justifyContent: "space-between" }}>
               <View style={{ flex: 1 }}>
-                <Muted>Agreed fare · {r.paymentMethod === "CASH" ? "pay the driver in cash" : "paid from wallet"}</Muted>
+                <Muted>{BigInt(r.discountAmount) > 0n ? "You pay" : "Agreed fare"} · {r.paymentMethod === "CASH" ? "pay the driver in cash" : r.paymentMethod === "CARD" ? "card charged at the end" : "paid from wallet"}</Muted>
                 <Txt variant="label" numberOfLines={1}>{r.dropoff.address}</Txt>
               </View>
-              <Txt variant="title">{naira(r.agreedFare)}</Txt>
+              <Txt variant="title">{naira(r.passengerPays)}</Txt>
             </Row>
+            {BigInt(r.discountAmount) > 0n ? <Muted>{naira(r.agreedFare)} fare − {naira(r.discountAmount)} promo, paid by Zuma</Muted> : null}
             <Muted>{km(r.distanceM)} trip · fare locked when you accepted</Muted>
           </Card>
 
@@ -189,7 +211,14 @@ function TripEnded({ ride, onDone }: { ride: RideView; onDone: () => void }) {
         <Pill label={completed ? "Trip completed" : "Trip cancelled"} tone={completed ? "green" : "red"} />
         <Txt variant="display">{completed ? naira(ride.finalFare ?? ride.agreedFare) : "Cancelled"}</Txt>
         <Muted variant="body">
-          {completed ? (ride.paymentMethod === "CASH" ? `Pay ${ride.driver.firstName} in cash.` : "Paid from your wallet.") : "No charge was made for this trip."}
+          {completed
+            ? ride.paymentMethod === "CASH"
+              ? `Pay ${ride.driver.firstName} ${naira(ride.passengerPays)} in cash.`
+              : ride.paymentMethod === "CARD"
+                ? `Charged to your card${ride.card?.last4 ? ` ••${ride.card.last4}` : ""}.`
+                : "Paid from your wallet."
+            : "No charge was made for this trip."}
+          {completed && BigInt(ride.discountAmount) > 0n ? ` You saved ${naira(ride.discountAmount)} with a promo.` : ""}
         </Muted>
         {completed ? (
           <Card>

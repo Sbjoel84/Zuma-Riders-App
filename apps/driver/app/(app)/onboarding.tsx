@@ -19,16 +19,14 @@ const CATEGORIES = [
   { key: "suv", name: "SUV", note: "6 seats" },
 ];
 
-/**
- * Registration: personal and licence details, then the vehicle, then wait for review.
- * Document uploads (licence photo, insurance, vehicle photos) arrive with the file storage phase;
- * until then an admin verifies documents in person and approves from the dashboard.
- */
+/** Registration: licence details, then the vehicle, then document photos, then review. */
 export default function Onboarding() {
   const qc = useQueryClient();
   const refreshMe = useSession((s) => s.refreshMe);
   const signOut = useSession((s) => s.signOut);
   const driver = useQuery({ queryKey: ["driver-me"], queryFn: () => api.get<DriverMe | null>("/v1/driver/me"), refetchInterval: 20_000 });
+  const docs = useQuery({ queryKey: ["documents"], enabled: !!driver.data?.vehicles.length, queryFn: () => api.get<{ complete: boolean; required: boolean; driver: { status: string }[]; vehicles: { documents: { status: string }[] }[] }>("/v1/driver/documents") });
+  const docCounts = docs.data ? [...docs.data.driver, ...docs.data.vehicles.flatMap((v) => v.documents)] : [];
 
   const [licence, setLicence] = useState("");
   const [expiry, setExpiry] = useState("");
@@ -87,7 +85,8 @@ export default function Onboarding() {
         <Row gap={space.sm}>
           <Pill label="1 Details" tone={d ? "green" : "amber"} />
           <Pill label="2 Vehicle" tone={d?.vehicles.length ? "green" : d ? "amber" : "neutral"} />
-          <Pill label="3 Review" tone={d?.verificationStatus === "APPROVED" ? "green" : d?.vehicles.length ? "amber" : "neutral"} />
+          <Pill label="3 Documents" tone={docs.data?.complete ? "green" : d?.vehicles.length ? "amber" : "neutral"} />
+          <Pill label="4 Review" tone={d?.verificationStatus === "APPROVED" ? "green" : docs.data?.complete ? "amber" : "neutral"} />
         </Row>
         {error ? <Banner text={error} /> : null}
 
@@ -121,9 +120,19 @@ export default function Onboarding() {
               {d.verificationStatus === "APPROVED"
                 ? "You can go online and start receiving requests."
                 : d.verificationStatus === "REJECTED"
-                  ? "Our team couldn't approve your registration. Contact support to fix it."
-                  : "Bring your licence, vehicle papers and insurance to the Zuma driver hub for verification. You'll be able to go online once we approve you."}
+                  ? "Our team couldn't approve your registration yet. Check your documents for what to fix."
+                  : docs.data?.complete
+                    ? "Thanks. Our team is checking your documents, usually within one working day. We'll notify you."
+                    : "Upload photos of your licence, ID, a selfie and your vehicle papers. We review them and notify you."}
             </Muted>
+            {d.verificationStatus !== "APPROVED" ? (
+              <Button
+                title={docs.data?.complete ? "View documents" : `Upload documents (${docCounts.filter((x) => x.status !== "MISSING").length} of ${docCounts.length || 8})`}
+                kind={docs.data?.complete ? "secondary" : "amber"}
+                onPress={() => router.push("/(app)/documents")}
+              />
+            ) : null}
+            {docCounts.some((x) => x.status === "REJECTED") ? <Banner tone="amber" text="Some documents need a new photo. Open Documents to see why." /> : null}
             {d.vehicles.map((v) => (
               <Row key={v.id} style={{ justifyContent: "space-between" }}>
                 <View style={{ flex: 1 }}>

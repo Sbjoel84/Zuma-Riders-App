@@ -1,5 +1,5 @@
 import type { EstimateResponse, PaymentMethodType, RideRequestView, WalletView } from "@zuma/contracts";
-import { ApiRequestError, api, Banner, Button, Chip, colors, errorMessage, km, Loading, minutes, Muted, naira, Row, Screen, space, Stepper, Txt } from "@zuma/mobile-core";
+import { ApiRequestError, api, Banner, Button, Chip, colors, errorMessage, Field, km, Loading, minutes, Muted, naira, Row, Screen, space, Stepper, Txt, type SavedCard } from "@zuma/mobile-core";
 import { useQuery } from "@tanstack/react-query";
 import * as Crypto from "expo-crypto";
 import { router } from "expo-router";
@@ -25,6 +25,12 @@ export default function Fare() {
     queryFn: () => api.post<EstimateResponse>("/v1/ride-requests/estimate", { pickup, dropoff }),
   });
   const wallet = useQuery({ queryKey: ["wallet"], queryFn: () => api.get<WalletView>("/v1/wallet") });
+  const cards = useQuery({ queryKey: ["cards"], queryFn: () => api.get<SavedCard[]>("/v1/payments/cards") });
+  const [promoInput, setPromoInput] = useState("");
+  const [promoOpen, setPromoOpen] = useState(false);
+  const [promo, setPromo] = useState<{ code: string; description: string; discount: bigint } | null>(null);
+  const [promoError, setPromoError] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
 
   useEffect(() => {
     if (estimate.data) setEstimate(estimate.data);
@@ -54,13 +60,30 @@ export default function Fare() {
   const min = BigInt(cat.minFare);
   const max = BigInt(cat.maxFare);
   const suggested = BigInt(cat.suggestedFare);
-  const walletShort = payment === "WALLET" && wallet.data && BigInt(wallet.data.availableBalance) < fare;
+  const card = cards.data?.find((c) => c.isDefault) ?? cards.data?.[0];
+  const discount = promo ? (promo.discount > fare - 100n ? fare - 100n : promo.discount) : 0n;
+  const pays = fare - discount;
+  const walletShort = payment === "WALLET" && wallet.data && BigInt(wallet.data.availableBalance) < pays;
+
+  const applyPromo = async () => {
+    setChecking(true);
+    setPromoError(null);
+    try {
+      const r = await api.post<{ code: string; description: string; estimatedDiscount: string | null }>("/v1/promos/check", { code: promoInput.trim(), categoryKey: cat.categoryKey, fare: fare.toString() });
+      setPromo({ code: r.code, description: r.description, discount: BigInt(r.estimatedDiscount ?? "0") });
+      setPromoOpen(false);
+    } catch (e) {
+      setPromoError(errorMessage(e));
+    } finally {
+      setChecking(false);
+    }
+  };
 
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
-      const r = await api.post<RideRequestView>("/v1/ride-requests", { pickup, dropoff, categoryKey: cat.categoryKey, proposedFare: fare.toString(), paymentMethod: payment }, idemKey.current);
+      const r = await api.post<RideRequestView>("/v1/ride-requests", { pickup, dropoff, categoryKey: cat.categoryKey, proposedFare: fare.toString(), paymentMethod: payment, promoCode: promo?.code }, idemKey.current);
       router.replace({ pathname: "/(app)/offers/[id]", params: { id: r.id } });
     } catch (e) {
       if (e instanceof ApiRequestError && e.code === "ACTIVE_REQUEST_EXISTS") {
@@ -115,12 +138,36 @@ export default function Fare() {
           <View accessibilityRole="radiogroup" style={{ flexDirection: "row", gap: space.sm }}>
             <Chip label="Cash" selected={payment === "CASH"} onPress={() => setPayment("CASH")} />
             <Chip label="Wallet" sub={wallet.data ? naira(wallet.data.availableBalance) : undefined} selected={payment === "WALLET"} onPress={() => setPayment("WALLET")} />
+            <Chip label="Card" sub={card ? `••${card.last4}` : "Add card"} selected={payment === "CARD"} onPress={() => (card ? setPayment("CARD") : router.push("/(app)/wallet"))} />
           </View>
           {walletShort ? <Banner tone="amber" text="Your wallet balance is lower than this fare. Pay with cash or top up." /> : null}
+          {payment === "CARD" ? <Muted>Your card is charged when the trip ends. If it's declined, we use your wallet or you pay the driver in cash.</Muted> : null}
+        </View>
+
+        <View style={{ gap: space.sm }}>
+          {promo ? (
+            <Row style={{ justifyContent: "space-between", backgroundColor: colors.greenSoft, padding: space.md, borderRadius: 12 }}>
+              <View style={{ flex: 1 }}>
+                <Txt variant="label">{promo.code} applied</Txt>
+                <Muted>{promo.description}. You pay {naira(pays)} if a driver accepts {naira(fare)}.</Muted>
+              </View>
+              <Button title="Remove" kind="ghost" style={{ minHeight: 40 }} onPress={() => setPromo(null)} />
+            </Row>
+          ) : promoOpen ? (
+            <>
+              <Field label="Promo code" value={promoInput} onChangeText={(t) => setPromoInput(t.toUpperCase())} autoCapitalize="characters" autoCorrect={false} error={promoError} placeholder="WELCOME50" />
+              <Row>
+                <Button title="Apply" style={{ flex: 1 }} kind="secondary" loading={checking} disabled={promoInput.trim().length < 3} onPress={applyPromo} />
+                <Button title="Cancel" style={{ flex: 1 }} kind="ghost" onPress={() => { setPromoOpen(false); setPromoError(null); }} />
+              </Row>
+            </>
+          ) : (
+            <Button title="Add a promo code" kind="ghost" onPress={() => setPromoOpen(true)} />
+          )}
         </View>
 
         {error ? <Banner text={error} /> : null}
-        <Button title={`Find drivers for ${naira(fare)}`} onPress={submit} loading={busy} disabled={!!walletShort} />
+        <Button title={`Find drivers for ${naira(fare)}`} onPress={submit} loading={busy} disabled={!!walletShort || (payment === "CARD" && !card)} />
       </ScrollView>
     </Screen>
   );

@@ -9,6 +9,7 @@ interface SosResult {
   opsAlerted: boolean;
   emergencyServicesContacted: boolean;
   emergencyNumbers: string[];
+  contactsNotified?: number;
 }
 
 /**
@@ -57,6 +58,8 @@ export default function Sos() {
         {state === "sent" ? (
           <Banner tone="green" text={result?.emergencyServicesContacted ? "The Zuma safety team has contacted emergency services and is following your trip." : "The Zuma safety team has your location and will call you shortly. Zuma has not contacted the police or an ambulance. Call them now if you are in danger."} />
         ) : null}
+        {state === "sent" && result?.contactsNotified ? <Muted variant="body">We texted your location to {result.contactsNotified} emergency contact{result.contactsNotified > 1 ? "s" : ""}.</Muted> : null}
+        {state === "sent" && result && !result.contactsNotified ? <Button title="Add emergency contacts for next time" kind="ghost" onPress={() => router.push("/(app)/contacts")} /> : null}
         {state === "failed" ? (
           <>
             <Banner text={`We couldn't reach Zuma: ${error}. Call emergency services directly.`} />

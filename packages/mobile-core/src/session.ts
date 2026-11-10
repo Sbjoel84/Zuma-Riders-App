@@ -2,6 +2,7 @@ import type { AppScope, AuthTokens, MeResponse } from "@zuma/contracts";
 import { Platform } from "react-native";
 import { create } from "zustand";
 import { api, onSignedOut } from "./api";
+import { unregisterPush } from "./push";
 import { installId, tokenStore } from "./storage";
 
 type Status = "loading" | "signedOut" | "signedIn";
@@ -57,6 +58,7 @@ export const useSession = create<SessionState>((set, get) => ({
   },
 
   signOut: async () => {
+    await unregisterPush();
     await api.post("/v1/auth/logout").catch(() => undefined);
     await tokenStore.clear();
     set({ status: "signedOut", me: null });

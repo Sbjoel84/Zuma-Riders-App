@@ -11,7 +11,6 @@ import { ABUJA_CENTER, useBooking } from "../../src/booking";
 
 export default function Home() {
   const me = useSession((s) => s.me);
-  const signOut = useSession((s) => s.signOut);
   const { pickup, setPickup, setEditing } = useBooking();
   const [permission, setPermission] = useState<"unknown" | "granted" | "denied">("unknown");
   const map = useRef<MapView>(null);
@@ -58,13 +57,13 @@ export default function Home() {
 
       <SafeAreaView edges={["top"]} style={styles.top}>
         <Row style={{ justifyContent: "space-between" }}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Sign out" onPress={signOut} style={styles.roundBtn}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Account and settings" onPress={() => router.push("/(app)/account")} style={styles.roundBtn}>
             <Txt variant="label">{(me?.firstName?.[0] ?? "Z").toUpperCase()}</Txt>
           </Pressable>
           <View style={styles.brand}><Txt variant="heading" color="#fff">zuma</Txt></View>
-          <View style={[styles.roundBtn, { width: undefined, paddingHorizontal: 14 }]} accessibilityLabel={`Wallet balance ${naira(wallet.data?.availableBalance)}`}>
+          <Pressable accessibilityRole="button" onPress={() => router.push("/(app)/wallet")} style={[styles.roundBtn, { width: undefined, paddingHorizontal: 14 }]} accessibilityLabel={`Wallet balance ${naira(wallet.data?.availableBalance)}. Open wallet`}>
             <Txt variant="label">{wallet.data ? naira(wallet.data.availableBalance) : "₦—"}</Txt>
-          </View>
+          </Pressable>
         </Row>
       </SafeAreaView>
 

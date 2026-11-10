@@ -28,6 +28,9 @@ export default function DriverTrip() {
   useServerEvent<{ rideId: string }>("ride.status", (e) => {
     if (e.rideId === id) qc.invalidateQueries({ queryKey: ["ride", id] });
   });
+  useServerEvent<{ rideId: string; message: { fromMe: boolean } }>("chat.message", (e) => {
+    if (e.rideId === id && !e.message.fromMe) qc.invalidateQueries({ queryKey: ["ride", id] });
+  });
 
   if (ride.isLoading) return <Screen><Loading label="Loading trip…" /></Screen>;
   if (ride.isError || !ride.data) return <Screen><Banner text={errorMessage(ride.error)} /></Screen>;
@@ -101,12 +104,18 @@ export default function DriverTrip() {
               <Muted style={{ color: colors.muted }}>{r.status === "TRIP_STARTED" ? "Drop-off" : "Pickup"}: {target.address}</Muted>
             </View>
             <View style={{ alignItems: "flex-end" }}>
-              <Txt variant="title" color={colors.ink}>{naira(r.agreedFare)}</Txt>
-              <Pill label={r.paymentMethod === "CASH" ? "Collect cash" : "Wallet"} tone={r.paymentMethod === "CASH" ? "green" : "blue"} />
+              <Txt variant="title" color={colors.ink}>{naira(r.paymentMethod === "CASH" ? r.passengerPays : r.agreedFare)}</Txt>
+              <Pill label={r.paymentMethod === "CASH" ? "Collect cash" : r.paymentMethod === "CARD" ? "Card" : "Wallet"} tone={r.paymentMethod === "CASH" ? "green" : "blue"} />
             </View>
           </Row>
 
-          <Button title={`Navigate to ${r.status === "TRIP_STARTED" ? "destination" : "pickup"}`} kind="secondary" style={{ borderColor: colors.line }} onPress={() => navigate(target.lat, target.lng)} />
+          {r.paymentMethod === "CASH" && BigInt(r.discountAmount) > 0n ? (
+            <Muted style={{ color: colors.muted }}>{r.passenger.firstName} has a promo: collect {naira(r.passengerPays)} in cash. Zuma adds the {naira(r.discountAmount)} discount to your wallet, so you still earn on {naira(r.agreedFare)}.</Muted>
+          ) : null}
+          <Row gap={space.sm}>
+            <Button title={`Navigate to ${r.status === "TRIP_STARTED" ? "destination" : "pickup"}`} kind="secondary" style={{ flex: 1, borderColor: colors.line }} onPress={() => navigate(target.lat, target.lng)} />
+            <Button title={r.unreadMessages ? `Chat · ${r.unreadMessages}` : "Chat"} kind={r.unreadMessages ? "amber" : "secondary"} style={{ flex: 0.6, borderColor: colors.line }} onPress={() => router.push({ pathname: "/(app)/chat/[id]", params: { id } })} />
+          </Row>
 
           {error ? <Banner text={error} /> : null}
 
@@ -148,7 +157,9 @@ function TripSummary({ ride, onDone }: { ride: RideView; onDone: () => void }) {
   const [stars, setStars] = useState(ride.myRating ?? 0);
   const [sent, setSent] = useState(ride.myRating !== null);
   const done = ride.status === "TRIP_COMPLETED";
-  const fare = BigInt(ride.finalFare ?? ride.agreedFare);
+  const fare = BigInt(ride.agreedFare);
+  const collect = BigInt(ride.passengerPays);
+  const discount = BigInt(ride.discountAmount);
   const commission = BigInt(ride.commissionAmount ?? "0");
 
   const rate = async (n: number) => {
@@ -163,12 +174,13 @@ function TripSummary({ ride, onDone }: { ride: RideView; onDone: () => void }) {
         <Pill label={done ? "Trip completed" : "Trip cancelled"} tone={done ? "green" : "red"} />
         {done ? (
           <>
-            <Txt variant="display">{ride.paymentMethod === "CASH" ? `Collect ${naira(fare)}` : naira(fare)}</Txt>
+            <Txt variant="display">{ride.paymentMethod === "CASH" ? `Collect ${naira(collect)}` : naira(fare)}</Txt>
             <Card>
               <Row style={{ justifyContent: "space-between" }}><Muted>Fare</Muted><Txt variant="label">{naira(fare)}</Txt></Row>
+              {discount > 0n ? <Row style={{ justifyContent: "space-between" }}><Muted>Promo paid by Zuma</Muted><Txt variant="label">{naira(discount)}</Txt></Row> : null}
               <Row style={{ justifyContent: "space-between" }}><Muted>Zuma commission</Muted><Txt variant="label">−{naira(commission)}</Txt></Row>
               <Row style={{ justifyContent: "space-between" }}><Txt variant="label">You earn</Txt><Txt variant="heading">{naira(fare - commission)}</Txt></Row>
-              <Muted>{ride.paymentMethod === "CASH" ? "The passenger pays you in cash. The commission is deducted from your Zuma wallet." : "Earnings arrive in your wallet after the 24-hour hold."}</Muted>
+              <Muted>{ride.paymentMethod === "CASH" ? `The passenger pays you ${naira(collect)} in cash. The commission${discount > 0n ? " and the promo top-up are" : " is"} settled in your Zuma wallet.` : `${ride.paymentMethod === "CARD" ? "Paid by card. " : ""}Earnings arrive in your wallet after the 24-hour hold.`}</Muted>
             </Card>
             <Card>
               <Txt variant="label">Rate {ride.passenger.firstName}</Txt>

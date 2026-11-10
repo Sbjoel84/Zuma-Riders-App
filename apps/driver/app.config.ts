@@ -22,7 +22,7 @@ const config: ExpoConfig = {
   android: {
     package: "com.zuma.driver",
     adaptiveIcon: { foregroundImage: "./assets/android-icon-foreground.png", backgroundImage: "./assets/android-icon-background.png", monochromeImage: "./assets/android-icon-monochrome.png" },
-    permissions: ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION", "ACCESS_BACKGROUND_LOCATION", "FOREGROUND_SERVICE", "FOREGROUND_SERVICE_LOCATION"],
+    permissions: ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION", "ACCESS_BACKGROUND_LOCATION", "FOREGROUND_SERVICE", "FOREGROUND_SERVICE_LOCATION", "POST_NOTIFICATIONS", "CAMERA"],
     config: { googleMaps: { apiKey: process.env.GOOGLE_MAPS_ANDROID_KEY } },
   },
   plugins: [
@@ -30,7 +30,11 @@ const config: ExpoConfig = {
     "expo-secure-store",
     ["expo-splash-screen", { image: "./assets/splash-icon.png", imageWidth: 160, resizeMode: "contain", backgroundColor: "#12161b" }],
     ["expo-location", { locationAlwaysAndWhenInUsePermission: LOCATION_COPY, isAndroidBackgroundLocationEnabled: true, isAndroidForegroundServiceEnabled: true }],
+    ["expo-notifications", { color: "#f2a900" }],
+    ["expo-image-picker", { cameraPermission: "Zuma Driver uses the camera to photograph your licence, vehicle papers and car for verification.", photosPermission: "Choose photos of your documents for verification." }],
+    "expo-web-browser",
   ],
+  extra: { apiUrl: process.env.EXPO_PUBLIC_API_URL, eas: { projectId: process.env.EAS_PROJECT_ID } },
 };
 
 export default config;

@@ -1,19 +1,21 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { EarningsView, WalletView } from "@zuma/contracts";
-import { api, Banner, Button, Card, Chip, errorMessage, Field, Loading, Muted, naira, Pill, Row, Screen, space, Txt } from "@zuma/mobile-core";
+import { api, Banner, Button, Card, Chip, colors, errorMessage, Field, Loading, Muted, naira, payByCard, Pill, Row, Screen, space, Txt } from "@zuma/mobile-core";
 import * as Crypto from "expo-crypto";
 import { router } from "expo-router";
 import { useRef, useState } from "react";
-import { RefreshControl, ScrollView, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, View } from "react-native";
 
-interface Bank { bankName: string; accountName: string; last4: string }
+interface Bank { bankName: string; bankCode: string | null; accountName: string; last4: string; verified: boolean }
 interface Withdrawal { id: string; amount: string; status: string; bank: string; rejectionReason: string | null; createdAt: string }
 
 const STATUS: Record<string, { label: string; tone: "amber" | "blue" | "green" | "red" | "neutral" }> = {
   REQUESTED: { label: "Requested", tone: "amber" },
-  APPROVED: { label: "Approved, transfer on the way", tone: "blue" },
+  APPROVED: { label: "Approved", tone: "blue" },
+  PROCESSING: { label: "Sending to your bank", tone: "blue" },
   COMPLETED: { label: "Paid", tone: "green" },
-  REJECTED: { label: "Rejected", tone: "red" },
+  REJECTED: { label: "Declined", tone: "red" },
+  FAILED: { label: "Failed, money returned", tone: "red" },
 };
 
 export default function Wallet() {
@@ -22,11 +24,12 @@ export default function Wallet() {
   const wallet = useQuery({ queryKey: ["driver-wallet"], queryFn: () => api.get<WalletView>("/v1/driver/wallet") });
   const earnings = useQuery({ queryKey: ["earnings", period], queryFn: () => api.get<EarningsView>(`/v1/driver/earnings?period=${period}`) });
   const bank = useQuery({ queryKey: ["bank"], queryFn: () => api.get<Bank | null>("/v1/driver/bank-account") });
-  const withdrawals = useQuery({ queryKey: ["withdrawals"], queryFn: () => api.get<Withdrawal[]>("/v1/driver/withdrawals") });
+  const withdrawals = useQuery({ queryKey: ["withdrawals"], queryFn: () => api.get<Withdrawal[]>("/v1/driver/withdrawals"), refetchInterval: (q) => ((q.state.data as Withdrawal[] | undefined)?.some((x) => x.status === "PROCESSING") ? 5_000 : false) });
+  const banks = useQuery({ queryKey: ["banks"], queryFn: () => api.get<{ name: string; code: string }[]>("/v1/payments/banks"), staleTime: 86_400_000 });
 
   const [editBank, setEditBank] = useState(false);
-  const [bankName, setBankName] = useState("");
-  const [accountName, setAccountName] = useState("");
+  const [bankSearch, setBankSearch] = useState("");
+  const [bankCode, setBankCode] = useState<string | null>(null);
   const [accountNumber, setAccountNumber] = useState("");
   const [amount, setAmount] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
@@ -43,15 +46,18 @@ export default function Wallet() {
   if (wallet.isLoading) return <Screen><Loading /></Screen>;
   const w = wallet.data;
   const available = w ? BigInt(w.availableBalance) : 0n;
-  const open = withdrawals.data?.some((x) => x.status === "REQUESTED" || x.status === "APPROVED");
+  const open = withdrawals.data?.some((x) => x.status === "REQUESTED" || x.status === "APPROVED" || x.status === "PROCESSING");
+  const chosenBank = banks.data?.find((b) => b.code === bankCode);
+  const bankMatches = bankSearch.trim().length >= 2 ? (banks.data ?? []).filter((b) => b.name.toLowerCase().includes(bankSearch.trim().toLowerCase())).slice(0, 6) : [];
 
   const saveBank = async () => {
+    if (!bankCode) return setError("Choose your bank");
     setBusy("bank");
     setError(null);
     try {
-      await api.put("/v1/driver/bank-account", { bankName: bankName.trim(), accountName: accountName.trim(), accountNumber: accountNumber.trim() });
+      const r = await api.put<Bank>("/v1/driver/bank-account", { bankCode, accountNumber: accountNumber.trim() });
       setEditBank(false);
-      setNotice("Bank account saved.");
+      setNotice(`Bank account verified: ${r.accountName}. Payouts go straight to this account.`);
       refresh();
     } catch (e) {
       setError(errorMessage(e));
@@ -69,7 +75,7 @@ export default function Wallet() {
       await api.post("/v1/driver/withdrawals", { amount: (BigInt(naira) * 100n).toString() }, withdrawKey.current);
       withdrawKey.current = Crypto.randomUUID();
       setAmount("");
-      setNotice("Withdrawal requested. Zuma finance reviews payouts on working days.");
+      setNotice("Withdrawal requested. Once approved, it's sent to your bank automatically.");
       refresh();
     } catch (e) {
       setError(errorMessage(e));
@@ -95,7 +101,25 @@ export default function Wallet() {
             <Muted>Pending (24-hour hold): {naira(w?.pendingBalance)}</Muted>
             <Muted>In payout: {naira(w?.heldBalance)}</Muted>
           </Row>
-          {available < 0n ? <Muted>You owe this in cash-trip commission. It's taken from your next wallet earnings.</Muted> : null}
+          {available < 0n ? (
+            <>
+              <Muted>You owe this in cash-trip commission. It's taken from your next wallet or card-trip earnings, or you can pay it now.</Muted>
+              <Button title={`Pay ${naira(-available)} by card or transfer`} kind="amber" loading={busy === "pay"} onPress={async () => {
+                setBusy("pay");
+                setError(null);
+                try {
+                  const p = await payByCard((-available).toString(), "zumadriver");
+                  if (p.status === "SUCCEEDED") setNotice(`Paid ${naira(p.amount)}. Thank you.`);
+                  else if (p.status !== "PENDING") setError("The payment didn't go through. You were not charged.");
+                  refresh();
+                } catch (e) {
+                  setError(errorMessage(e));
+                } finally {
+                  setBusy(null);
+                }
+              }} />
+            </>
+          ) : null}
         </Card>
 
         <Card>
@@ -117,15 +141,31 @@ export default function Wallet() {
           <Txt variant="heading">Bank account</Txt>
           {bank.data && !editBank ? (
             <Row style={{ justifyContent: "space-between" }}>
-              <View><Txt variant="label">{bank.data.bankName} ••{bank.data.last4}</Txt><Muted>{bank.data.accountName}</Muted></View>
-              <Button title="Change" kind="secondary" onPress={() => { setEditBank(true); setBankName(bank.data!.bankName); setAccountName(bank.data!.accountName); }} />
+              <View style={{ flex: 1 }}>
+                <Txt variant="label">{bank.data.bankName} ••{bank.data.last4}</Txt>
+                <Muted>{bank.data.accountName}{bank.data.verified ? " · verified" : " · re-add to get automatic payouts"}</Muted>
+              </View>
+              <Button title="Change" kind="secondary" onPress={() => { setEditBank(true); setBankCode(bank.data!.bankCode); setBankSearch(bank.data!.bankName ?? ""); }} />
             </Row>
           ) : (
             <>
-              <Field label="Bank" value={bankName} onChangeText={setBankName} placeholder="GTBank" />
-              <Field label="Account name" value={accountName} onChangeText={setAccountName} placeholder="As it appears on your account" />
-              <Field label="Account number" value={accountNumber} onChangeText={(v) => setAccountNumber(v.replace(/\D/g, ""))} keyboardType="number-pad" maxLength={10} hint="10-digit NUBAN" />
-              <Button title="Save bank account" onPress={saveBank} loading={busy === "bank"} />
+              {chosenBank ? (
+                <Row style={{ justifyContent: "space-between" }}>
+                  <Txt variant="label">{chosenBank.name}</Txt>
+                  <Button title="Change bank" kind="ghost" onPress={() => { setBankCode(null); setBankSearch(""); }} />
+                </Row>
+              ) : (
+                <>
+                  <Field label="Bank" value={bankSearch} onChangeText={setBankSearch} placeholder="Start typing, e.g. GT, Opay, Zenith" autoCorrect={false} />
+                  {bankMatches.map((b) => (
+                    <Pressable key={b.code} accessibilityRole="button" onPress={() => { setBankCode(b.code); setBankSearch(b.name); }} style={{ paddingVertical: space.sm, borderBottomWidth: 1, borderBottomColor: colors.nightLine }}>
+                      <Txt>{b.name}</Txt>
+                    </Pressable>
+                  ))}
+                </>
+              )}
+              <Field label="Account number" value={accountNumber} onChangeText={(v) => setAccountNumber(v.replace(/\D/g, ""))} keyboardType="number-pad" maxLength={10} hint="10-digit NUBAN. We check the account name with your bank." />
+              <Button title="Verify and save" onPress={saveBank} loading={busy === "bank"} disabled={!bankCode || accountNumber.length !== 10} />
             </>
           )}
         </Card>

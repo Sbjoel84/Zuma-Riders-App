@@ -129,6 +129,14 @@ export default function Home() {
             <Muted variant="body" center>Go online to receive ride requests near you. You choose which trips to take and at what price.</Muted>
             <Button title="Go online" kind="amber" onPress={toggle} loading={toggling} />
             <Button title="Wallet and earnings" kind="secondary" onPress={() => router.push("/(app)/wallet")} />
+            <Row gap={space.sm}>
+              <Button title="Documents" kind="secondary" style={{ flex: 1 }} onPress={() => router.push("/(app)/documents")} />
+              <Button title="Invite drivers" kind="secondary" style={{ flex: 1 }} onPress={() => router.push("/(app)/invite")} />
+            </Row>
+            <Row gap={space.sm}>
+              <Button title="Emergency contacts" kind="ghost" style={{ flex: 1 }} onPress={() => router.push("/(app)/contacts")} />
+              <Button title="Notifications" kind="ghost" style={{ flex: 1 }} onPress={() => router.push("/(app)/notifications")} />
+            </Row>
             <Button title="Help and support" kind="ghost" onPress={() => router.push("/(app)/report")} />
             <Button title="Sign out" kind="ghost" onPress={signOut} />
           </View>
@@ -193,7 +201,7 @@ function RequestCard({ r, onDone }: { r: DriverRequestView; onDone: (msg: string
         </View>
         <View style={{ alignItems: "flex-end" }}>
           <Txt variant="label" color={colors.ink}>{r.passenger.firstName} · ★ {r.passenger.ratingAvg}</Txt>
-          <Txt variant="label" color={r.paymentMethod === "CASH" ? colors.green : colors.blue}>{r.paymentMethod === "CASH" ? "Cash" : "Wallet"}</Txt>
+          <Txt variant="label" color={r.paymentMethod === "CASH" ? colors.green : colors.blue}>{r.paymentMethod === "CASH" ? "Cash" : r.paymentMethod === "CARD" ? "Card" : "Wallet"}</Txt>
         </View>
       </Row>
       <View style={{ gap: 4 }}>
