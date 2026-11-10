@@ -1,11 +1,14 @@
 import { Injectable } from "@nestjs/common";
-import type { CancelBody, CreateOfferBody, CreateRideRequestBody, DriverRequestView, RideRequestView } from "@zuma/contracts";
+import { Money, type CancelBody, type CreateOfferBody, type CreateRideRequestBody, type DriverRequestView, type RideRequestView } from "@zuma/contracts";
 import { DomainError, fail } from "../../common/errors";
 import { MapsService } from "../../infra/maps.service";
 import { isUniqueViolation, PrismaService } from "../../infra/prisma.service";
 import { AvailabilityService } from "../geo/availability.service";
 import { WalletService } from "../ledger/wallet.service";
+import { NotificationsService } from "../notifications/notifications.service";
+import { PaymentsService } from "../payments/payments.service";
 import { PricingService } from "../pricing/pricing.service";
+import { PromosService } from "../promos/promos.service";
 import { EventsService } from "../realtime/events.service";
 import { shortCode, tripPinHash } from "./codes";
 import { MatchingService } from "./matching.service";
@@ -22,6 +25,9 @@ export class NegotiationService {
     private readonly wallets: WalletService,
     private readonly events: EventsService,
     private readonly maps: MapsService,
+    private readonly payments: PaymentsService,
+    private readonly promos: PromosService,
+    private readonly notify: NotificationsService,
   ) {}
 
   private async passengerFor(userId: string) {
@@ -54,7 +60,7 @@ export class NegotiationService {
     const openReq = await this.prisma.db.rideRequest.findFirst({ where: { passengerId: passenger.id, status: { in: OPEN_REQUEST_STATUSES } } });
     if (openReq) fail("ACTIVE_REQUEST_EXISTS", "You already have an open request", { requestId: openReq.id });
 
-    if (body.paymentMethod === "CARD") fail("VALIDATION_FAILED", "Card payments are coming soon. Choose cash or wallet.");
+    if (body.paymentMethod === "CARD" && !(await this.payments.defaultCard(userId))) fail("CARD_REQUIRED", "Add a card first. Top up your wallet by card once and we'll save it.");
 
     const est = await this.pricing.estimate({ pickup: body.pickup, dropoff: body.dropoff, categoryKey: body.categoryKey });
     const category = await this.prisma.db.vehicleCategory.findUniqueOrThrow({ where: { key: body.categoryKey } });
@@ -62,10 +68,12 @@ export class NegotiationService {
     const bounds = PricingService.bounds(cfg, est.distanceM, est.durationS);
     const proposed = BigInt(body.proposedFare);
     PricingService.assertProposal(proposed, bounds);
+    const promo = body.promoCode ? await this.promos.validate(userId, body.promoCode, body.categoryKey, proposed) : null;
 
     if (body.paymentMethod === "WALLET") {
       const w = await this.wallets.ensureWallet(userId, "PASSENGER");
-      if (w.availableBalance < proposed) fail("WALLET_INSUFFICIENT", "Your wallet balance is too low for this fare");
+      const payable = proposed - BigInt(promo?.estimatedDiscount ?? "0");
+      if (w.availableBalance < payable) fail("WALLET_INSUFFICIENT", "Your wallet balance is too low for this fare");
     }
 
     const area = await this.prisma.db.serviceArea.findUniqueOrThrow({ where: { id: est.serviceAreaId } });
@@ -81,7 +89,7 @@ export class NegotiationService {
             pickupAddress: body.pickup.address, pickupLat: body.pickup.lat, pickupLng: body.pickup.lng,
             dropoffAddress: body.dropoff.address, dropoffLat: body.dropoff.lat, dropoffLng: body.dropoff.lng,
             routeDistanceM: est.distanceM, routeDurationS: est.durationS, routePolyline: est.polyline,
-            suggestedFare: bounds.suggested, proposedFare: proposed, paymentMethod: body.paymentMethod, passengerNote: body.note,
+            suggestedFare: bounds.suggested, proposedFare: proposed, paymentMethod: body.paymentMethod, passengerNote: body.note, promoCodeId: promo?.promoCodeId,
             idempotencyKey, currentRadiusM: area.searchRadiusM, expiresAt,
             waypoints: {
               create: [
@@ -178,12 +186,13 @@ export class NegotiationService {
         if (offer.status !== "PENDING") throw new DomainError("DRIVER_NO_LONGER_AVAILABLE", "This driver withdrew their offer");
         if (offer.expiresAt < new Date()) throw new DomainError("OFFER_EXPIRED", "This offer has expired");
 
+        const full = await tx.rideRequest.findUniqueOrThrow({ where: { id: requestId }, include: { pricingConfig: true, category: true } });
+        const discount = await this.promos.discountFor(tx, full.promoCodeId, userId, full.category.key, offer.amount);
+
         if (req.paymentMethod === "WALLET") {
           const w = await tx.wallet.findUnique({ where: { userId_ownerType: { userId, ownerType: "PASSENGER" } } });
-          if (!w || w.availableBalance < offer.amount) throw new DomainError("WALLET_INSUFFICIENT", "Your wallet balance is too low for this offer");
+          if (!w || w.availableBalance < offer.amount - discount) throw new DomainError("WALLET_INSUFFICIENT", "Your wallet balance is too low for this offer");
         }
-
-        const full = await tx.rideRequest.findUniqueOrThrow({ where: { id: requestId }, include: { pricingConfig: true } });
         const driver = await tx.driver.findUniqueOrThrow({ where: { id: offer.driverId } });
 
         const id = (await tx.$queryRaw<Array<{ id: string }>>`SELECT gen_random_uuid()::text AS id`)[0]!.id;
@@ -191,7 +200,7 @@ export class NegotiationService {
           data: {
             id, code: full.code.replace("R-", "T-"), rideRequestId: requestId, acceptedOfferId: offerId,
             passengerId: passenger.id, driverId: offer.driverId, vehicleId: offer.vehicleId,
-            agreedFare: offer.amount, commissionBps: full.pricingConfig.commissionBps,
+            agreedFare: offer.amount, discountAmount: discount, commissionBps: full.pricingConfig.commissionBps,
             paymentMethod: full.paymentMethod, tripPinHash: tripPinHash(id), status: "DRIVER_SELECTED",
             statusHistory: { create: { fromStatus: null, toStatus: "DRIVER_SELECTED", actorType: "PASSENGER", actorUserId: userId } },
           },
@@ -218,6 +227,7 @@ export class NegotiationService {
     this.events.toDriver(driverId, "ride.assigned", { rideId, requestId });
     this.events.toDriver(driverId, "offer.result", { requestId, offerId, result: "ACCEPTED", rideId });
     this.events.toUser(userId, "ride_request.status", { requestId, status: "DRIVER_SELECTED", rideId });
+    this.notify.send(driverUserId, { category: "TRIP", title: "Offer accepted", body: "Head to the pickup point. The passenger is waiting.", data: { type: "ride", rideId }, channelId: "rides" });
     const others = await this.prisma.db.rideOffer.findMany({ where: { rideRequestId: requestId, id: { not: offerId } }, select: { id: true, driverId: true } });
     others.forEach((o) => this.events.toDriver(o.driverId, "offer.result", { requestId, offerId: o.id, result: "REJECTED" }));
     await this.matching.notifyClosed(requestId, "ASSIGNED_OTHER", driverId);
@@ -295,6 +305,12 @@ export class NegotiationService {
     const fresh = await this.prisma.db.rideRequest.findUniqueOrThrow({ where: { id: requestId }, include: requestInclude });
     const ov = fresh.offers.find((o) => o.id === saved.id)!;
     this.events.toUser(fresh.passenger.userId, "offer.upserted", { requestId, offer: offerView(ov) });
+    if (!prev) {
+      this.notify.send(fresh.passenger.userId, {
+        category: "TRIP", title: `${d.user.firstName} offered ${Money.format(amount)}`, body: `${d.activeVehicle!.colour} ${d.activeVehicle!.make} ${d.activeVehicle!.model}${eta ? ` · ${Math.max(1, Math.round(eta / 60))} min away` : ""}`,
+        data: { type: "offers", requestId }, channelId: "rides", inbox: false,
+      });
+    }
     return driverRequestView(fresh, d.id, dist);
   }
 

@@ -1,6 +1,7 @@
 import { CanActivate, ExecutionContext, Injectable, SetMetadata } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import { DomainError } from "../../common/errors";
+import { admin2faRequired } from "../../config/env";
 import type { AppRequest, AuthContext } from "../../common/http";
 import { PrismaService } from "../../infra/prisma.service";
 import { RedisService } from "../../infra/redis.service";
@@ -48,8 +49,21 @@ export class AuthGuard implements CanActivate {
       if (auth.scope !== "ADMIN") throw new DomainError("FORBIDDEN", "Admin access required");
       const has = await this.hasPermission(auth.userId, permission);
       if (!has) throw new DomainError("FORBIDDEN", `Missing permission ${permission}`);
+      if (admin2faRequired() && !(await this.hasTotp(auth.userId))) {
+        throw new DomainError("MFA_SETUP_REQUIRED", "Set up two-factor sign-in with an authenticator app to continue");
+      }
     }
     return true;
+  }
+
+  private async hasTotp(userId: string): Promise<boolean> {
+    const key = `mfa:enabled:${userId}`;
+    const cached = await this.redis.client.get(key);
+    if (cached !== null) return cached === "1";
+    const a = await this.prisma.db.adminProfile.findUnique({ where: { userId }, select: { totpEnabledAt: true } });
+    const on = Boolean(a?.totpEnabledAt);
+    await this.redis.client.set(key, on ? "1" : "0", "EX", 60);
+    return on;
   }
 
   private async hasPermission(userId: string, key: string): Promise<boolean> {

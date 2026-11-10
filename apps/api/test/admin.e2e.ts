@@ -96,8 +96,8 @@ describe("admin API", () => {
     // No bank account → refused
     const nobank = await D.post("/v1/driver/withdrawals", { amount: "500000" }, true).expect(422);
     expect(nobank.body.error.message).toMatch(/bank account/);
-    await D.put("/v1/driver/bank-account", { bankName: "GTBank", accountName: "Halima Yakubu", accountNumber: "0123456789" }).expect(200);
-    expect((await D.get("/v1/driver/bank-account").expect(200)).body).toMatchObject({ last4: "6789" });
+    await D.put("/v1/driver/bank-account", { bankCode: "058", accountNumber: "0123456789" }).expect(200);
+    expect((await D.get("/v1/driver/bank-account").expect(200)).body).toMatchObject({ last4: "6789", bankName: "Guaranty Trust Bank", verified: true });
 
     // Request ₦5,000 → held
     const wd = await D.post("/v1/driver/withdrawals", { amount: "500000" }, true).expect(201);
@@ -106,10 +106,11 @@ describe("admin API", () => {
     const twice = await D.post("/v1/driver/withdrawals", { amount: "100000" }, true).expect(422);
     expect(twice.body.error.message).toMatch(/in progress/);
 
-    // Paid before approval is refused; approve → paid
+    // Paid before approval is refused; approve sends a Paystack transfer; the webhook completes it
     await A.post(`/v1/admin/finance/withdrawals/${wd.body.id}/paid`, { bankReference: "GTB-889201" }).expect(409);
-    await A.post(`/v1/admin/finance/withdrawals/${wd.body.id}/approve`).expect(200);
-    await A.post(`/v1/admin/finance/withdrawals/${wd.body.id}/paid`, { bankReference: "GTB-889201" }).expect(200);
+    const appr = await A.post(`/v1/admin/finance/withdrawals/${wd.body.id}/approve`).expect(200);
+    expect(appr.body.status).toBe("PROCESSING");
+    await t.paystackWebhook("transfer.success", { reference: `zuma-wd-${wd.body.id}`, status: "success" }).expect(200);
     wallet = (await D.get("/v1/driver/wallet")).body;
     expect(wallet).toMatchObject({ availableBalance: "1500000", heldBalance: "0" });
 
@@ -124,7 +125,8 @@ describe("admin API", () => {
     const summary = await A.get("/v1/admin/finance/summary?days=7").expect(200);
     expect(summary.body.integrity).toEqual({ unbalancedTransactions: 0, walletsOutOfSync: 0 });
     const journal = await A.get("/v1/admin/finance/ledger").expect(200);
-    expect(journal.body.data[0].type).toBe("WITHDRAWAL_RELEASE");
+    // Other suites' delayed jobs (earnings release) can post in between, so look for the latest withdrawal entry.
+    expect(journal.body.data.find((x: { type: string }) => x.type.startsWith("WITHDRAWAL")).type).toBe("WITHDRAWAL_RELEASE");
     expect(await balanced()).toBe(0);
     await D.post("/v1/driver/availability/offline").expect(200);
   });

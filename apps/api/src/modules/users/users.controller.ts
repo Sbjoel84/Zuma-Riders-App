@@ -47,7 +47,9 @@ export class UsersController {
     if (body.referralCode) {
       const referrer = await this.prisma.db.user.findUnique({ where: { referralCode: body.referralCode.toUpperCase() } });
       const already = await this.prisma.db.referral.findUnique({ where: { refereeId: auth.userId } });
-      if (referrer && referrer.id !== auth.userId && !already) {
+      const me = await this.prisma.db.user.findUniqueOrThrow({ where: { id: auth.userId } });
+      const isNew = me.createdAt > new Date(Date.now() - 7 * 86400_000);
+      if (referrer && referrer.id !== auth.userId && !already && isNew) {
         await this.prisma.db.referral.create({ data: { referrerId: referrer.id, refereeId: auth.userId, refereeRole: auth.scope === "DRIVER" ? "DRIVER" : "PASSENGER" } });
       }
     }

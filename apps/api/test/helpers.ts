@@ -5,6 +5,8 @@ import request from "supertest";
 import { normalizeNigerianPhone } from "@zuma/contracts";
 import { createApp } from "../src/app.factory";
 import { SmsService } from "../src/infra/sms.service";
+import { signWebhook } from "../src/infra/payments.gateway";
+import { NotificationsService } from "../src/modules/notifications/notifications.service";
 
 export const PLACES = {
   wuse2: { lat: 9.0765, lng: 7.479, address: "Wuse 2, Aminu Kano Crescent, Abuja" },
@@ -85,6 +87,27 @@ export class TestApp {
     await admin.post(`/v1/admin/vehicles/${veh.body.id}/approve`).expect(200);
     await api.post("/v1/driver/availability/online", at).expect(200);
     return { ...t, driverId: onboard.body.id as string, vehicleId: veh.body.id as string };
+  }
+
+  /** Delivers a correctly signed Paystack webhook. */
+  paystackWebhook(event: string, data: Record<string, unknown>) {
+    const raw = JSON.stringify({ event, data: { id: Math.floor(Math.random() * 1e9), ...data } });
+    return this.http().post("/v1/webhooks/paystack").set("Content-Type", "application/json").set("x-paystack-signature", signWebhook(raw)).send(raw);
+  }
+
+  /** Completes the fake Paystack checkout the way a customer would. */
+  payCheckout(reference: string, outcome: "success" | "success_decline_later" | "failed" = "success") {
+    return this.http().post(`/v1/payments/fake-checkout/${reference}`).type("form").send({ outcome });
+  }
+
+  /** Pushes sent to a user, after waiting for in-flight deliveries. */
+  async pushes(userId: string) {
+    await this.app.get(NotificationsService).flush();
+    return this.app.get(NotificationsService).outbox.filter((m) => m.userId === userId);
+  }
+
+  smsTo(phone: string) {
+    return this.app.get(SmsService).outbox.filter((m) => m.to === (normalizeNigerianPhone(phone) ?? phone));
   }
 
   async socket(token: string): Promise<Socket> {

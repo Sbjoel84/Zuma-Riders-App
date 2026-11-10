@@ -4,6 +4,7 @@ import { z } from "zod";
 import { DomainError, fail } from "../../common/errors";
 import { Auth, type AuthContext, ZodPipe } from "../../common/http";
 import { PrismaService } from "../../infra/prisma.service";
+import { SmsService } from "../../infra/sms.service";
 import { RequirePermission, Scopes } from "../auth/auth.guard";
 import { AdminContext } from "../admin/admin.support";
 import { EventsService } from "../realtime/events.service";
@@ -27,15 +28,34 @@ export class SafetyController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly events: EventsService,
+    private readonly sms: SmsService,
   ) {}
+
+  /** Texts the person's emergency contacts once per incident. Returns how many were reached. */
+  private async alertContacts(incidentId: string, userId: string, lat: number, lng: number, ride: { code: string; vehicle: { colour: string; make: string; model: string; plateNumber: string }; driver: { user: { firstName: string } }; passenger: { user: { firstName: string } } } | null, reporterIsDriver: boolean) {
+    const contacts = await this.prisma.db.emergencyContact.findMany({ where: { userId, deletedAt: null } });
+    if (!contacts.length) return 0;
+    const me = await this.prisma.db.user.findUniqueOrThrow({ where: { id: userId } });
+    const time = new Date().toLocaleTimeString("en-NG", { timeZone: "Africa/Lagos", hour: "2-digit", minute: "2-digit" });
+    const trip = ride
+      ? reporterIsDriver
+        ? ` They were driving trip ${ride.code} with rider ${ride.passenger.user.firstName}.`
+        : ` They were in a ${ride.vehicle.colour} ${ride.vehicle.make} ${ride.vehicle.model} ${ride.vehicle.plateNumber}, driver ${ride.driver.user.firstName}.`
+      : "";
+    const body = `URGENT: ${me.firstName} ${me.lastName} pressed SOS in the Zuma app at ${time}.${trip} Location: https://maps.google.com/?q=${lat.toFixed(5)},${lng.toFixed(5)} . Try to reach them. If you can't, call 112.`;
+    let sent = 0;
+    for (const c of contacts) await this.sms.send(c.phoneE164, body).then(() => sent++).catch(() => undefined);
+    await this.prisma.db.safetyIncident.update({ where: { id: incidentId }, data: { contactsNotifiedAt: new Date() } });
+    return sent;
+  }
 
   @Post("sos")
   async sos(@Auth() auth: AuthContext, @Body(new ZodPipe(SosBody)) body: z.infer<typeof SosBody>) {
     let rideId: string | null = null;
     let cityId: string | null = null;
     const ride = body.rideId
-      ? await this.prisma.db.ride.findUnique({ where: { id: body.rideId }, include: { passenger: true, driver: true, rideRequest: true } })
-      : await this.prisma.db.ride.findFirst({ where: { status: { in: ACTIVE_RIDE_STATUSES }, OR: [{ passenger: { userId: auth.userId } }, { driver: { userId: auth.userId } }] }, include: { passenger: true, driver: true, rideRequest: true } });
+      ? await this.prisma.db.ride.findUnique({ where: { id: body.rideId }, include: { passenger: { include: { user: true } }, driver: { include: { user: true } }, rideRequest: true, vehicle: true } })
+      : await this.prisma.db.ride.findFirst({ where: { status: { in: ACTIVE_RIDE_STATUSES }, OR: [{ passenger: { userId: auth.userId } }, { driver: { userId: auth.userId } }] }, include: { passenger: { include: { user: true } }, driver: { include: { user: true } }, rideRequest: true, vehicle: true } });
     if (ride && (ride.passenger.userId === auth.userId || ride.driver.userId === auth.userId)) {
       rideId = ride.id;
       cityId = ride.rideRequest.cityId;
@@ -50,9 +70,19 @@ export class SafetyController {
           data: { type: "SOS", reporterId: auth.userId, reporterRole: auth.scope === "DRIVER" ? "DRIVER" : "PASSENGER", rideId, lat: body.lat, lng: body.lng, description: body.note, timeline: [entry] },
         });
     if (city) this.events.toAdmins(city.id, "admin.safety.incident", { id: incident.id, type: "SOS", rideId, lat: body.lat, lng: body.lng });
+    const contactsNotified = open?.contactsNotifiedAt
+      ? 0
+      : await this.alertContacts(incident.id, auth.userId, body.lat, body.lng, rideId && ride ? ride : null, auth.scope === "DRIVER").catch(() => 0);
+    if (contactsNotified) {
+      await this.prisma.db.safetyIncident.update({
+        where: { id: incident.id },
+        data: { timeline: [...((incident.timeline as TimelineEntry[] | null) ?? []), { at: new Date().toISOString(), actor: "system", event: `Texted ${contactsNotified} emergency contact(s)` }] },
+      });
+    }
     return {
       incidentId: incident.id,
       opsAlerted: true,
+      contactsNotified,
       emergencyServicesContacted: incident.externalEscalatedAt !== null,
       emergencyNumbers: (city?.supportContacts as { emergencyNumbers?: string[] } | null)?.emergencyNumbers ?? ["112"],
     };

@@ -191,6 +191,7 @@ export const CreateRideRequestBody = z.object({
   proposedFare: kobo,
   paymentMethod: PaymentMethodType,
   note: z.string().max(200).optional(),
+  promoCode: z.string().trim().min(3).max(30).optional(),
 });
 export type CreateRideRequestBody = z.infer<typeof CreateRideRequestBody>;
 
@@ -251,6 +252,7 @@ export interface RideRequestView {
   expiresAt: string;
   offers: OfferView[];
   rideId: string | null;
+  promo: null | { code: string; description: string };
 }
 
 export interface DriverRequestView {
@@ -278,7 +280,11 @@ export interface RideView {
   agreedFare: string;
   finalFare: string | null;
   commissionAmount: string | null;
+  /** Promo discount funded by Zuma; the passenger pays agreedFare − discount, the driver earns on agreedFare. */
+  discountAmount: string;
+  passengerPays: string;
   paymentMethod: PaymentMethodType;
+  card: null | { brand: string | null; last4: string | null };
   pickup: Place;
   dropoff: Place;
   distanceM: number;
@@ -294,6 +300,7 @@ export interface RideView {
   cancelledAt: string | null;
   myRating: number | null;
   shareToken: string | null;
+  unreadMessages: number;
 }
 
 export interface WalletView {
@@ -325,6 +332,8 @@ export const ErrorCode = z.enum([
   "DRIVER_NO_LONGER_AVAILABLE", "INVALID_STATE_TRANSITION", "RIDE_STATE_CHANGED",
   "INVALID_TRIP_PIN", "PIN_ATTEMPTS_EXCEEDED", "TOO_FAR_FROM_PICKUP", "ALREADY_RATED",
   "DRIVER_NOT_VERIFIED", "NO_ACTIVE_VEHICLE", "DRIVER_SUSPENDED", "WALLET_LIMIT_EXCEEDED",
+  "PAYMENT_FAILED", "CARD_REQUIRED", "PROMO_INVALID", "FILE_INVALID", "DOCUMENTS_INCOMPLETE",
+  "MFA_SETUP_REQUIRED", "MFA_INVALID", "CHAT_CLOSED",
   "INTERNAL",
 ]);
 export type ErrorCode = z.infer<typeof ErrorCode>;
@@ -354,6 +363,9 @@ export const SocketEvents = {
   RideStatus: "ride.status",
   RideDriverLocation: "ride.driver_location",
   DriverForcedOffline: "driver.forced_offline",
+  ChatMessage: "chat.message",
+  ChatRead: "chat.read",
+  PaymentUpdated: "payment.updated",
   // client → server
   DriverHeartbeat: "driver.heartbeat",
   DriverLocation: "driver.location",

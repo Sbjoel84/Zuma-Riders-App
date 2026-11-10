@@ -115,7 +115,7 @@ describe("negotiation edge cases", () => {
     const moto = await P.post("/v1/ride-requests/estimate", { pickup: PLACES.wuse2, dropoff: PLACES.jabi, categoryKey: "motorcycle" }).expect(422);
     expect(moto.body.error.code).toBe("CATEGORY_UNAVAILABLE");
     const card = await P.post("/v1/ride-requests", { pickup: PLACES.wuse2, dropoff: PLACES.jabi, categoryKey: "economy", proposedFare: "500000", paymentMethod: "CARD" }, true).expect(422);
-    expect(card.body.error.code).toBe("VALIDATION_FAILED");
+    expect(card.body.error.code).toBe("CARD_REQUIRED");
   });
 
   it("keeps unverified drivers offline and out of matching", async () => {

@@ -12,6 +12,8 @@
     "demo-data": "tsc -p tsconfig.scripts.json && node dist-scripts/scripts/demo-data.js"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3",
+    "@aws-sdk/s3-request-presigner": "^3",
     "@nestjs/common": "^11.1.0",
     "@nestjs/core": "^11.1.0",
     "@nestjs/platform-express": "^11.1.0",
@@ -37,14 +39,14 @@
     "@types/express": "^5.0.0",
     "@types/jest": "^29.5.0",
     "@types/node": "^22.10.0",
+    "@types/pg": "^8.11.0",
     "@types/supertest": "^6.0.2",
     "concurrently": "^9.1.0",
     "jest": "^29.7.0",
+    "pg": "^8.13.0",
     "socket.io-client": "^4.8.0",
     "supertest": "^7.0.0",
-    "typescript": "^5.9.0",
-    "pg": "^8.13.0",
-    "@types/pg": "^8.11.0",
-    "tsx": "^4.19.0"
+    "tsx": "^4.19.0",
+    "typescript": "^5.9.0"
   }
 }

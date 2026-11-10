@@ -39,13 +39,17 @@ export class AdminFinanceController {
     const days = Math.min(90, Math.max(1, parseInt(daysStr ?? "1", 10) || 1));
     const from = lagosDayStart(days - 1);
     const db = this.prisma.db;
-    const [gross, cash, wallet, commission, cancelFees, trips] = await Promise.all([
+    const [gross, cash, wallet, card, commission, cancelFees, trips, promo, topups, fees] = await Promise.all([
       db.ride.aggregate({ _sum: { finalFare: true }, where: { status: "TRIP_COMPLETED", completedAt: { gte: from } } }),
       db.ride.aggregate({ _sum: { finalFare: true }, where: { status: "TRIP_COMPLETED", completedAt: { gte: from }, paymentMethod: "CASH" } }),
       db.ride.aggregate({ _sum: { finalFare: true }, where: { status: "TRIP_COMPLETED", completedAt: { gte: from }, paymentMethod: "WALLET" } }),
+      db.ride.aggregate({ _sum: { finalFare: true }, where: { status: "TRIP_COMPLETED", completedAt: { gte: from }, paymentMethod: "CARD" } }),
       db.commission.aggregate({ _sum: { amount: true }, where: { createdAt: { gte: from } } }),
       db.rideCancellation.aggregate({ _sum: { feeAmount: true }, where: { createdAt: { gte: from }, feeWaived: false } }),
       db.ride.count({ where: { status: "TRIP_COMPLETED", completedAt: { gte: from } } }),
+      db.promoRedemption.aggregate({ _sum: { amount: true }, where: { createdAt: { gte: from } } }),
+      db.payment.aggregate({ _sum: { amount: true }, _count: true, where: { provider: "PAYSTACK", purpose: { in: ["WALLET_TOPUP", "COMMISSION_SETTLEMENT"] }, status: "SUCCEEDED", verifiedAt: { gte: from } } }),
+      db.payment.aggregate({ _sum: { feeAmount: true }, where: { provider: "PAYSTACK", status: "SUCCEEDED", verifiedAt: { gte: from } } }),
     ]);
     const byType = await db.wallet.groupBy({ by: ["ownerType"], _sum: { availableBalance: true, pendingBalance: true, heldBalance: true } });
     const pos = await db.wallet.groupBy({ by: ["ownerType"], where: { availableBalance: { gt: 0 } }, _sum: { availableBalance: true } });
@@ -55,7 +59,7 @@ export class AdminFinanceController {
       const p = pos.find((b) => b.ownerType === t)?._sum.availableBalance ?? 0n;
       return p + (g?.pendingBalance ?? 0n) + (g?.heldBalance ?? 0n);
     };
-    const pendingWd = await db.withdrawal.aggregate({ _sum: { amount: true }, _count: true, where: { status: { in: ["REQUESTED", "APPROVED"] } } });
+    const pendingWd = await db.withdrawal.aggregate({ _sum: { amount: true }, _count: true, where: { status: { in: ["REQUESTED", "APPROVED", "PROCESSING"] } } });
     const unbalanced = await db.$queryRaw<Array<{ n: bigint }>>`
       SELECT count(*)::bigint AS n FROM (SELECT "transactionId" FROM "LedgerEntry" GROUP BY "transactionId"
       HAVING SUM(CASE WHEN direction='DEBIT' THEN amount ELSE -amount END) <> 0) x`;
@@ -67,6 +71,10 @@ export class AdminFinanceController {
       gross: (gross._sum.finalFare ?? 0n).toString(),
       cashGross: (cash._sum.finalFare ?? 0n).toString(),
       walletGross: (wallet._sum.finalFare ?? 0n).toString(),
+      cardGross: (card._sum.finalFare ?? 0n).toString(),
+      promoSpend: (promo._sum.amount ?? 0n).toString(),
+      cardTopups: { count: topups._count, amount: (topups._sum.amount ?? 0n).toString() },
+      providerFees: (fees._sum.feeAmount ?? 0n).toString(),
       commission: (commission._sum.amount ?? 0n).toString(),
       cancellationFees: (cancelFees._sum.feeAmount ?? 0n).toString(),
       passengerLiability: liab("PASSENGER").toString(),
@@ -103,11 +111,12 @@ export class AdminFinanceController {
   @RequirePermission("finance:read")
   @Get("withdrawals")
   async listWithdrawals(@Query("status") status?: string) {
-    const where: Prisma.WithdrawalWhereInput = status === "open" ? { status: { in: ["REQUESTED", "APPROVED"] } } : status ? { status: status as WithdrawalStatus } : {};
+    const where: Prisma.WithdrawalWhereInput = status === "open" ? { status: { in: ["REQUESTED", "APPROVED", "PROCESSING"] } } : status ? { status: status as WithdrawalStatus } : {};
     const rows = await this.prisma.db.withdrawal.findMany({ where, orderBy: { createdAt: "desc" }, take: 100, include: { wallet: { include: { user: true } }, approvedBy: { include: { user: true } } } });
     return rows.map((w) => ({
       id: w.id, driver: name(w.wallet.user), phone: w.wallet.user.phoneE164, amount: w.amount.toString(), bank: `${w.bankName} ••${w.bankAccountLast4}`,
-      status: w.status, rejectionReason: w.rejectionReason, bankReference: w.providerRef, approvedBy: w.approvedBy ? name(w.approvedBy.user) : null,
+      status: w.status, rejectionReason: w.rejectionReason, bankReference: w.providerRef, approvedBy: w.approvedBy ? name(w.approvedBy.user) : w.approvedAt ? "Automatic" : null,
+      automatic: w.provider === "PAYSTACK" && w.recipientCode !== "MANUAL",
       createdAt: w.createdAt.toISOString(), completedAt: w.completedAt?.toISOString() ?? null, availableAfter: w.wallet.availableBalance.toString(),
     }));
   }
@@ -117,9 +126,49 @@ export class AdminFinanceController {
   @HttpCode(200)
   async approve(@Auth() auth: AuthContext, @Param("id") id: string) {
     const adminId = await this.admin.adminId(auth);
-    await this.withdrawals.approve(id, adminId);
+    const r = await this.withdrawals.approve(id, adminId);
     await this.admin.action(adminId, "withdrawals.approve", "Withdrawal", id);
-    return { id, status: "APPROVED" };
+    return { id, ...r };
+  }
+
+  /** Retry a Paystack transfer that Paystack refused (withdrawal is back in APPROVED). */
+  @RequirePermission("finance:payout")
+  @Post("withdrawals/:id/send")
+  @HttpCode(200)
+  async send(@Auth() auth: AuthContext, @Param("id") id: string) {
+    const adminId = await this.admin.adminId(auth);
+    const r = await this.withdrawals.send(id);
+    await this.admin.action(adminId, "withdrawals.send", "Withdrawal", id);
+    return { id, ...r };
+  }
+
+  @RequirePermission("finance:read")
+  @Get("payments")
+  async payments(@Query("status") status?: string, @Query("purpose") purpose?: string, @Query("cursor") cursor?: string) {
+    const { _take, ...args } = pageArgs(cursor, "50");
+    const rows = await this.prisma.db.payment.findMany({
+      where: { provider: "PAYSTACK", ...(status ? { status: status as never } : {}), ...(purpose ? { purpose: purpose as never } : {}) },
+      orderBy: { createdAt: "desc" }, ...args, include: { user: true, paymentMethod: true, ride: { select: { id: true, code: true } } },
+    });
+    const p = page(rows, _take);
+    return {
+      nextCursor: p.nextCursor,
+      data: p.data.map((x) => ({
+        id: x.id, reference: x.reference, purpose: x.purpose, status: x.status, amount: x.amount.toString(), fee: x.feeAmount.toString(),
+        user: name(x.user), phone: x.user.phoneE164, card: x.paymentMethod ? `${x.paymentMethod.cardBrand ?? "card"} ••${x.paymentMethod.cardLast4 ?? ""}` : null,
+        ride: x.ride, failureReason: x.failureReason, createdAt: x.createdAt.toISOString(), verifiedAt: x.verifiedAt?.toISOString() ?? null,
+      })),
+    };
+  }
+
+  @RequirePermission("finance:read")
+  @Get("webhooks")
+  async webhooks() {
+    const rows = await this.prisma.db.paymentWebhook.findMany({ orderBy: { receivedAt: "desc" }, take: 50 });
+    return rows.map((w) => ({
+      id: w.id, eventType: w.eventType, status: w.status, signatureValid: w.signatureValid, error: w.processingError,
+      reference: ((w.payload as { data?: { reference?: string } } | null)?.data?.reference) ?? null, receivedAt: w.receivedAt.toISOString(),
+    }));
   }
 
   @RequirePermission("finance:payout")

@@ -9,14 +9,21 @@ import { Scopes } from "../auth/auth.guard";
 import { AvailabilityService } from "../geo/availability.service";
 import { WalletService } from "../ledger/wallet.service";
 import { WithdrawalsService } from "../ledger/withdrawals.service";
+import { DocumentsService } from "../files/documents.service";
 import { TripsService } from "../rides/trips.service";
 import { DriversService } from "./drivers.service";
 
 const BankBody = z.object({
-  bankName: z.string().trim().min(2).max(60),
-  accountName: z.string().trim().min(3).max(100),
+  bankCode: z.string().trim().min(3).max(10),
   accountNumber: z.string().regex(/^\d{10}$/, "NUBAN account numbers have 10 digits"),
 });
+const DocBody = z.object({
+  fileId: z.string().min(10),
+  documentNumber: z.string().trim().min(3).max(40).optional(),
+  expiresAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD").optional(),
+});
+const DriverDocBody = DocBody.extend({ type: z.enum(["DRIVERS_LICENCE", "NATIONAL_ID", "PROFILE_PHOTO"]) });
+const VehicleDocBody = DocBody.extend({ type: z.enum(["VEHICLE_REGISTRATION", "ROADWORTHINESS", "INSURANCE", "PHOTO_FRONT", "PHOTO_BACK"]) });
 const WithdrawBody = z.object({ amount: kobo });
 
 @Scopes("DRIVER")
@@ -29,6 +36,7 @@ export class DriversController {
     private readonly trips: TripsService,
     private readonly prisma: PrismaService,
     private readonly withdrawals: WithdrawalsService,
+    private readonly documents: DocumentsService,
   ) {}
 
   private async driverId(userId: string) {
@@ -88,20 +96,34 @@ export class DriversController {
   }
 
   /**
-   * Bank details for manual payouts. Only the bank, account name and last four digits are kept;
-   * the full number is needed once to set up a provider transfer recipient (payments phase).
+   * Payout account. The account name comes from the bank (name enquiry), and the account is registered
+   * as a Paystack transfer recipient. We keep only the bank, account name, last four digits and the
+   * recipient code — never the full account number.
    */
   @Put("bank-account")
-  async bank(@Auth() auth: AuthContext, @Body(new ZodPipe(BankBody)) body: z.infer<typeof BankBody>) {
-    const id = await this.driverId(auth.userId);
-    await this.prisma.db.driver.update({ where: { id }, data: { bankName: body.bankName, bankAccountName: body.accountName, bankAccountLast4: body.accountNumber.slice(-4) } });
-    return { bankName: body.bankName, accountName: body.accountName, last4: body.accountNumber.slice(-4) };
+  bank(@Auth() auth: AuthContext, @Body(new ZodPipe(BankBody)) body: z.infer<typeof BankBody>) {
+    return this.withdrawals.setBankAccount(auth.userId, body.bankCode, body.accountNumber);
   }
 
   @Get("bank-account")
   async getBank(@Auth() auth: AuthContext) {
     const d = await this.prisma.db.driver.findUnique({ where: { userId: auth.userId } });
-    return d?.bankAccountLast4 ? { bankName: d.bankName, accountName: d.bankAccountName, last4: d.bankAccountLast4 } : null;
+    return d?.bankAccountLast4 ? { bankName: d.bankName, bankCode: d.bankCode, accountName: d.bankAccountName, last4: d.bankAccountLast4, verified: Boolean(d.payoutRecipientCode) } : null;
+  }
+
+  @Get("documents")
+  docs(@Auth() auth: AuthContext) {
+    return this.documents.forDriver(auth.userId);
+  }
+
+  @Post("documents")
+  submitDoc(@Auth() auth: AuthContext, @Body(new ZodPipe(DriverDocBody)) body: z.infer<typeof DriverDocBody>) {
+    return this.documents.submitDriverDoc(auth.userId, body);
+  }
+
+  @Post("vehicles/:id/documents")
+  submitVehicleDoc(@Auth() auth: AuthContext, @Param("id") id: string, @Body(new ZodPipe(VehicleDocBody)) body: z.infer<typeof VehicleDocBody>) {
+    return this.documents.submitVehicleDoc(auth.userId, id, body);
   }
 
   @Post("withdrawals")

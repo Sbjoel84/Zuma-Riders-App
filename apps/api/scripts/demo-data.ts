@@ -14,11 +14,17 @@ import "dotenv/config";
 process.env.SMS_PROVIDER = "console";
 process.env.OTP_LIMIT_PER_IP_HOUR = "100000";
 process.env.OTP_LIMIT_PER_PHONE_10MIN = "1000";
+process.env.PAYMENTS_PROVIDER = "fake";
+process.env.PUSH_PROVIDER = "console";
+process.env.STORAGE_PROVIDER = "local";
+process.env.ADMIN_2FA_REQUIRED = "false";
 
 import { normalizeNigerianPhone } from "@zuma/contracts";
 import { randomUUID } from "crypto";
 import { createApp } from "../src/app.factory";
 import { SmsService } from "../src/infra/sms.service";
+import { NotificationsService } from "../src/modules/notifications/notifications.service";
+import { carImage, documentImage, selfieImage } from "./demo-images";
 
 const DB = process.env.DATABASE_URL ?? "";
 if (process.env.NODE_ENV === "production" || !/@(localhost|127\.0\.0\.1)[:/]/.test(DB)) {
@@ -70,7 +76,39 @@ async function main() {
     get: <T = any>(p: string) => call<T>(t, "GET", p),
     post: <T = any>(p: string, b?: unknown, idem = false) => call<T>(t, "POST", p, b ?? {}, idem),
     put: <T = any>(p: string, b?: unknown) => call<T>(t, "PUT", p, b ?? {}),
+    token: t,
   });
+
+  /** Uploads bytes the way the apps do: ask for an upload URL, PUT the file, return the file id. */
+  const upload = async (api: ReturnType<typeof as>, purpose: string, png: Buffer) => {
+    const u = await api.post("/v1/files/uploads", { purpose, mimeType: "image/png", sizeBytes: png.length });
+    const res = await fetch(base + new URL(u.uploadUrl).pathname, { method: "PUT", headers: { "Content-Type": "image/png" }, body: png });
+    if (!res.ok) throw new Error(`upload failed ${res.status}`);
+    return u.fileId as string;
+  };
+  const bands: Array<[number, number, number]> = [[31, 122, 79], [29, 79, 138], [140, 60, 40], [90, 60, 140]];
+  const skins: Array<[number, number, number]> = [[120, 82, 60], [92, 62, 45], [140, 98, 72], [105, 72, 52]];
+  const colourOf = (name: string): [number, number, number] =>
+    ({ Silver: [190, 192, 196], Grey: [120, 124, 128], Black: [35, 35, 38], White: [240, 240, 240], Red: [170, 30, 35], Blue: [30, 70, 150], Gold: [200, 170, 90] } as Record<string, [number, number, number]>)[name] ?? [150, 150, 150];
+  /** Uploads the 3 driver + 5 vehicle documents. */
+  const uploadDocs = async (api: ReturnType<typeof as>, vehicleId: string, i: number, colour: string, licence: string) => {
+    const docs = await api.get("/v1/driver/documents");
+    if (docs.complete) return;
+    await api.post("/v1/driver/documents", { type: "DRIVERS_LICENCE", fileId: await upload(api, "DRIVER_DOCUMENT", documentImage(bands[0]!, i)), documentNumber: licence, expiresAt: "2029-03-01" });
+    await api.post("/v1/driver/documents", { type: "NATIONAL_ID", fileId: await upload(api, "DRIVER_DOCUMENT", documentImage(bands[1]!, i + 3)), documentNumber: `2${String(i).padStart(2, "0")}48817390` });
+    await api.post("/v1/driver/documents", { type: "PROFILE_PHOTO", fileId: await upload(api, "DRIVER_DOCUMENT", selfieImage(skins[i % 4]!, bands[(i + 1) % 4]!)) });
+    const v = (type: string, png: Buffer, extra: object = {}) => upload(api, "VEHICLE_DOCUMENT", png).then((fileId) => api.post(`/v1/driver/vehicles/${vehicleId}/documents`, { type, fileId, ...extra }));
+    await v("VEHICLE_REGISTRATION", documentImage(bands[2]!, i + 5), { expiresAt: "2027-08-31" });
+    await v("ROADWORTHINESS", documentImage(bands[3]!, i + 7), { expiresAt: "2027-08-31" });
+    await v("INSURANCE", documentImage(bands[1]!, i + 9), { documentNumber: `AXA-${100231 + i}`, expiresAt: "2027-05-31" });
+    await v("PHOTO_FRONT", carImage(colourOf(colour)));
+    await v("PHOTO_BACK", carImage(colourOf(colour), true));
+  };
+  const approveAllDocs = async (driverId: string) => {
+    const docs = await admin.get(`/v1/admin/drivers/${driverId}/documents`);
+    for (const d of docs.driver) if (d.id && d.status === "PENDING") await admin.post(`/v1/admin/documents/driver/${d.id}/approve`);
+    for (const v of docs.vehicles) for (const d of v.documents) if (d.id && d.status === "PENDING") await admin.post(`/v1/admin/documents/vehicle/${d.id}/approve`);
+  };
 
   const login = async (phone: string, appScope: "PASSENGER" | "DRIVER" | "ADMIN") => {
     const r = await call<{ otpId: string }>(null, "POST", "/v1/auth/otp/request", { phone, appScope });
@@ -118,14 +156,32 @@ async function main() {
     return { d, driverId: onboard.id as string, vehicleId: vehicleId! };
   };
 
+  let docIdx = 0;
   for (const s of driverSpecs) {
     const { d, driverId, vehicleId } = await register(s);
+    if (!onlineOnly) {
+      await uploadDocs(d, vehicleId, docIdx++, s.car[3] as string, `ABJ${s.phone.slice(-5)}AA01`);
+      await approveAllDocs(driverId);
+    }
     await admin.post(`/v1/admin/vehicles/${vehicleId}/approve`).catch(() => undefined);
     await admin.post(`/v1/admin/drivers/${driverId}/approve`).catch(() => undefined);
     await d.post("/v1/driver/availability/online", s.at).catch(() => undefined);
     drivers[s.first] = { api: d, id: driverId, spec: s, pos: { lat: s.at.lat, lng: s.at.lng } };
   }
-  if (!onlineOnly) for (const s of pendingSpecs) await register(s);
+  if (!onlineOnly) {
+    for (const s of pendingSpecs) {
+      const { d, driverId, vehicleId } = await register(s);
+      await uploadDocs(d, vehicleId, docIdx++, s.car[3] as string, `ABJ${s.phone.slice(-5)}AA01`);
+      if (s.first === "Emeka") {
+        // Part-reviewed: licence approved, selfie rejected and waiting for a new upload.
+        const docs = await admin.get(`/v1/admin/drivers/${driverId}/documents`);
+        const lic = docs.driver.find((x: { type: string }) => x.type === "DRIVERS_LICENCE");
+        const pic = docs.driver.find((x: { type: string }) => x.type === "PROFILE_PHOTO");
+        if (lic?.status === "PENDING") await admin.post(`/v1/admin/documents/driver/${lic.id}/approve`);
+        if (pic?.status === "PENDING") await admin.post(`/v1/admin/documents/driver/${pic.id}/reject`, { reason: "Face is not clear. Retake the photo in good light without a cap." });
+      }
+    }
+  }
   console.log(`Drivers: ${driverSpecs.length} approved and online, ${pendingSpecs.length} waiting for verification`);
 
   if (!onlineOnly) {
@@ -140,19 +196,40 @@ async function main() {
     pax[first] = as(await login(phone, "PASSENGER"));
     await pax[first]!.post("/v1/me/profile", { firstName: first, lastName: last, termsVersion: "2026-11", email: `${first.toLowerCase()}@example.com` }).catch(() => undefined);
   }
-  // Two passengers top up their wallets at the hub (audited admin adjustments).
-  for (const name of ["Hauwa", "Ngozi"]) {
-    const w = await admin.get(`/v1/admin/finance/wallets?q=${encodeURIComponent(name)}`);
+  // One passenger tops up at the hub (audited admin adjustment); three pay by card through checkout, saving the card.
+  {
+    const w = await admin.get(`/v1/admin/finance/wallets?q=Hauwa`);
     const hit = w.find((x: { ownerType: string }) => x.ownerType === "PASSENGER");
     if (hit) await admin.post(`/v1/admin/finance/wallets/${hit.userId}/adjust`, { ownerType: "PASSENGER", direction: "CREDIT", amount: "2000000", reason: "Cash top-up at Wuse hub" });
   }
+  const cardTopup = async (who: string, amount: string, outcome = "success") => {
+    const start = await pax[who]!.post("/v1/payments/topups", { amount }, true);
+    await fetch(`${base}/v1/payments/fake-checkout/${start.reference}`, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: `outcome=${outcome}`, redirect: "manual" });
+    return pax[who]!.post(`/v1/payments/${start.reference}/verify`);
+  };
+  await cardTopup("Ngozi", "2000000");
+  await cardTopup("Tunde", "500000");
+  await cardTopup("Zainab", "1000000");
+  await cardTopup("Femi", "300000", "failed");
+
+  // Promotions and a referral.
+  const now = Date.now();
+  await admin.post("/v1/admin/promotions", { name: "Welcome to Zuma", description: "Half off the first ride for new riders", code: "WELCOME50", discountType: "PERCENTAGE", discountValue: 50, maxDiscount: "150000", firstRideOnly: true, budget: "100000000", startsAt: new Date(now - 7 * 86400_000).toISOString(), endsAt: new Date(now + 60 * 86400_000).toISOString() }).catch(() => undefined);
+  await admin.post("/v1/admin/promotions", { name: "Abuja weekend", description: "₦500 off weekend rides", code: "ABJWEEKEND", discountType: "FIXED_AMOUNT", discountValue: 50000, minFare: "200000", perUserLimit: 4, usageLimit: 2000, startsAt: new Date(now - 86400_000).toISOString(), endsAt: new Date(now + 14 * 86400_000).toISOString() }).catch(() => undefined);
+  const amakaCode = (await pax.Amaka!.get("/v1/me/referrals")).code as string;
+  await pax.Ifeanyi!.post("/v1/me/referral", { code: amakaCode }).catch(() => undefined);
+  for (const [who, contact, phone] of [["Blessing", "Uduak Akpan (brother)", "08095550101"], ["Amaka", "Chioma Okonkwo", "08095550102"]] as const) {
+    await pax[who]!.post("/v1/me/emergency-contacts", { name: contact, phone }).catch(() => undefined);
+  }
 
   // ---------------- trips ----------------
-  const book = async (who: string, from: Place, to: Place, cat: string, delta: bigint, method: "CASH" | "WALLET") => {
+  const book = async (who: string, from: Place, to: Place, cat: string, delta: bigint, method: "CASH" | "WALLET" | "CARD", promoCode?: string) => {
     const p = pax[who]!;
     const est = await p.post("/v1/ride-requests/estimate", { pickup: from, dropoff: to, categoryKey: cat });
     const fare = (BigInt(est.categories[0].suggestedFare) + delta).toString();
-    const req = await p.post("/v1/ride-requests", { pickup: from, dropoff: to, categoryKey: cat, proposedFare: fare, paymentMethod: method }, true);
+    // Re-runs: a first-ride code is no longer valid for someone who already rode, so book without it.
+    const req = await p.post("/v1/ride-requests", { pickup: from, dropoff: to, categoryKey: cat, proposedFare: fare, paymentMethod: method, promoCode }, true)
+      .catch((e: Error) => (promoCode && e.message.includes("PROMO_INVALID") ? p.post("/v1/ride-requests", { pickup: from, dropoff: to, categoryKey: cat, proposedFare: fare, paymentMethod: method }, true) : Promise.reject(e)));
     return { id: req.id as string, fare: BigInt(fare) };
   };
   const negotiate = async (who: string, reqId: string, driverName: string, counter?: bigint) => {
@@ -189,18 +266,25 @@ async function main() {
     await ping(driverName, to, 10);
   };
 
-  const trips: Array<[string, Place, Place, string, bigint, "CASH" | "WALLET", string, bigint | undefined, number]> = [
+  const trips: Array<[string, Place, Place, string, bigint, "CASH" | "WALLET" | "CARD", string, bigint | undefined, number, string?]> = [
     ["Amaka", P.wuse2, P.airport, "economy", -50000n, "CASH", "Ibrahim", 50000n, 5],
-    ["Tunde", P.maitama, P.jabi, "comfort", 0n, "CASH", "Musa", 40000n, 5],
+    ["Tunde", P.maitama, P.jabi, "comfort", 0n, "CARD", "Musa", 40000n, 5],
     ["Hauwa", P.jabi, P.gwarinpa, "economy", 0n, "WALLET", "Chinedu", undefined, 4],
-    ["Femi", P.garki, P.lugbe, "economy", -30000n, "CASH", "Aliyu", 30000n, 5],
-    ["Ngozi", P.asokoro, P.wusemarket, "suv", 0n, "WALLET", "Peter", undefined, 5],
+    ["Femi", P.garki, P.lugbe, "economy", -30000n, "CASH", "Aliyu", 30000n, 5, "WELCOME50"],
+    ["Ngozi", P.asokoro, P.wusemarket, "suv", 0n, "WALLET", "Peter", undefined, 5, "ABJWEEKEND"],
     ["Ifeanyi", P.gwarinpa, P.lifecamp, "economy", 0n, "CASH", "Yusuf", undefined, 3],
+    ["Zainab", P.cbd, P.maitama, "economy", 0n, "CARD", "Fatima", undefined, 5, "WELCOME50"],
   ];
-  for (const [who, from, to, cat, delta, method, drv, counter, stars] of trips) {
+  for (const [who, from, to, cat, delta, method, drv, counter, stars, promo] of trips) {
     await ping(drv, near(from, 0.001), 0);
-    const req = await book(who, from, to, cat, delta, method);
+    const req = await book(who, from, to, cat, delta, method, promo);
     const rideId = await negotiate(who, req.id, drv, counter ? req.fare + counter : undefined);
+    if (who === "Amaka") {
+      const say = (api: ReturnType<typeof as>, body: string) => api.post(`/v1/rides/${rideId}/messages`, { clientMessageId: randomUUID(), body });
+      await say(drivers[drv]!.api, "Good afternoon, I'm 3 minutes away. Silver Corolla.");
+      await say(pax[who]!, "Okay, I'm in front of the bank by the gate");
+      await say(drivers[drv]!.api, "I'm here, hazard lights on");
+    }
     await drive(who, drv, rideId, from, to, "done", stars);
     console.log(`Completed ${who} with ${drv}: ${from.address.split(",")[0]} → ${to.address.split(",")[0]}`);
   }
@@ -229,11 +313,11 @@ async function main() {
   console.log("Live: 2 trips in progress, 1 open request with an offer, 1 cancelled trip");
 
   // ---------------- payouts, support, safety ----------------
-  for (const [name, bank, acct] of [["Ibrahim", "GTBank", "0123455520"], ["Peter", "Access Bank", "0098760912"]] as const) {
+  for (const [name, bank, acct] of [["Ibrahim", "058", "0123455520"], ["Peter", "044", "0098760912"]] as const) {
     const d = drivers[name]!.api;
     const me = await d.get("/v1/me");
     await admin.post(`/v1/admin/finance/wallets/${me.id}/adjust`, { ownerType: "DRIVER", direction: "CREDIT", amount: "6400000", reason: "Weekly incentive: 40 trips" });
-    await d.put("/v1/driver/bank-account", { bankName: bank, accountName: `${drivers[name]!.spec.first} ${drivers[name]!.spec.last}`, accountNumber: acct });
+    await d.put("/v1/driver/bank-account", { bankCode: bank, accountNumber: acct });
     await d.post("/v1/driver/withdrawals", { amount: name === "Ibrahim" ? "5000000" : "3500000" }, true).catch(() => undefined);
   }
 
@@ -242,7 +326,8 @@ async function main() {
   await pax.Amaka!.post("/v1/support/tickets", { category: "LOST_PROPERTY", subject: "Left my laptop bag in the car", body: "Black laptop bag on the back seat. Please help me reach the driver.", rideId: amaka.data[0]?.id });
   await drivers.Aliyu!.api.post("/v1/support/tickets", { category: "PAYMENT", subject: "Commission looks too high", body: "I was charged commission twice this morning, please check." });
   await pax.Blessing!.post("/v1/safety/sos", { rideId: r2, lat: 9.1302, lng: 7.3651 });
-  console.log("Payout requests: 2 · tickets: 3 · SOS: 1 open");
+  console.log("Payout requests: 2 · tickets: 3 · SOS: 1 open · card top-ups: 3 (+1 declined) · promos: 2 · documents uploaded for 11 drivers");
+  await app.get(NotificationsService).flush();
   }
 
   clearInterval(heartbeat);

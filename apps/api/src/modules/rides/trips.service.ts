@@ -1,5 +1,6 @@
 import { Injectable, OnModuleInit } from "@nestjs/common";
-import type { CancelBody, EarningsView, RateBody, RideView } from "@zuma/contracts";
+import { Money, type CancelBody, type EarningsView, type RateBody, type RideView } from "@zuma/contracts";
+import type { Payment } from "@zuma/database";
 import { timingSafeEqual } from "crypto";
 import { env } from "../../config/env";
 import { DomainError, fail } from "../../common/errors";
@@ -7,6 +8,9 @@ import type { AuthContext } from "../../common/http";
 import { haversineM } from "../../infra/maps.service";
 import { isUniqueViolation, PrismaService } from "../../infra/prisma.service";
 import { AvailabilityService } from "../geo/availability.service";
+import { NotificationsService } from "../notifications/notifications.service";
+import { PaymentsService } from "../payments/payments.service";
+import type { RewardPaid } from "../promos/referrals.service";
 import { EventsService } from "../realtime/events.service";
 import { tripPin } from "./codes";
 import { JobsService } from "./jobs.service";
@@ -24,6 +28,8 @@ export class TripsService implements OnModuleInit {
     private readonly events: EventsService,
     private readonly settlement: SettlementService,
     private readonly jobs: JobsService,
+    private readonly payments: PaymentsService,
+    private readonly notify: NotificationsService,
   ) {}
 
   onModuleInit() {
@@ -49,7 +55,15 @@ export class TripsService implements OnModuleInit {
     const r = await this.load(rideId);
     const actor = this.actorFor(r, auth);
     const pos = ACTIVE_RIDE_STATUSES.includes(r.status) ? await this.availability.position(r.driverId) : null;
-    return rideView(r, actor === "SYSTEM" ? "ADMIN" : actor, pos);
+    const unread = actor === "PASSENGER" || actor === "DRIVER" ? await this.unread(r.id, auth.userId) : 0;
+    return rideView(r, actor === "SYSTEM" ? "ADMIN" : actor, pos, unread);
+  }
+
+  private async unread(rideId: string, userId: string): Promise<number> {
+    const conv = await this.prisma.db.conversation.findUnique({ where: { rideId }, include: { participants: { where: { userId } } } });
+    if (!conv) return 0;
+    const lastRead = conv.participants[0]?.lastReadAt ?? new Date(0);
+    return this.prisma.db.message.count({ where: { conversationId: conv.id, createdAt: { gt: lastRead }, senderId: { not: userId } } });
   }
 
   /** What the app should show on launch: an active trip, an open request, or nothing. */
@@ -101,8 +115,18 @@ export class TripsService implements OnModuleInit {
       }
     }
 
+    // Card trips: charge the saved card before the completion transaction (network call, idempotent per ride).
+    let cardPayment: Payment | null = null;
+    let cardFailure: string | null = null;
+    if (event === "COMPLETE" && ride.paymentMethod === "CARD") {
+      const amount = ride.agreedFare + ride.waitingCharge - ride.discountAmount;
+      const r = await this.payments.chargeForRide(ride.id, ride.passenger.userId, amount, ride.code);
+      cardPayment = r.payment;
+      cardFailure = r.reason;
+    }
+
     const now = new Date();
-    let settlementInfo: { switchedToCash: boolean; method: string } | null = null;
+    let settlementInfo: { switchedToCash: boolean; switchedToWallet: boolean; method: string; finalFare: bigint; rewards: RewardPaid[] } | null = null;
     let cancelFee = 0n;
 
     await this.prisma.db.$transaction(async (tx) => {
@@ -123,10 +147,10 @@ export class TripsService implements OnModuleInit {
       });
 
       if (event === "COMPLETE") {
-        const s = await this.settlement.settle(tx, ride.id);
-        await tx.ride.update({ where: { id: ride.id }, data: { finalFare: s.finalFare, paymentMethod: s.method } });
+        const s = await this.settlement.settle(tx, ride.id, cardPayment);
+        await tx.ride.update({ where: { id: ride.id }, data: { finalFare: s.finalFare, paymentMethod: s.method, shareToken: null } });
         await tx.rideRequest.update({ where: { id: ride.rideRequestId }, data: { status: "TRIP_COMPLETED" } });
-        settlementInfo = { switchedToCash: s.switchedToCash, method: s.method };
+        settlementInfo = { switchedToCash: s.switchedToCash, switchedToWallet: s.switchedToWallet, method: s.method, finalFare: s.finalFare, rewards: s.rewards };
       }
 
       if (event === "CANCEL") {
@@ -141,6 +165,7 @@ export class TripsService implements OnModuleInit {
           },
         });
         await tx.rideRequest.update({ where: { id: ride.rideRequestId }, data: { status: "CANCELLED", cancelledAt: now } });
+        await tx.ride.update({ where: { id: ride.id }, data: { shareToken: null } });
         if (actor === "DRIVER") {
           const d = await tx.driver.findUniqueOrThrow({ where: { id: ride.driverId } });
           const n = d.tripsCompleted + 1;
@@ -152,12 +177,43 @@ export class TripsService implements OnModuleInit {
     });
 
     if (to === "TRIP_COMPLETED" || to === "CANCELLED") await this.availability.markFree(ride.driverId);
-    if (to === "TRIP_COMPLETED" && (settlementInfo as { method: string } | null)?.method === "WALLET") {
+    const settled = settlementInfo as { switchedToCash: boolean; switchedToWallet: boolean; method: string; finalFare: bigint; rewards: RewardPaid[] } | null;
+    if (to === "TRIP_COMPLETED" && settled && settled.method !== "CASH") {
       await this.jobs.add("release", { rideId: ride.id }, { delayMs: env().EARNINGS_HOLD_S * 1000, jobId: `release-${ride.id}` });
     }
     const fresh = await this.load(ride.id);
-    this.events.toRide(ride.id, "ride.status", { rideId: ride.id, status: fresh.status, version: fresh.version, at: now.toISOString(), finalFare: fresh.finalFare?.toString() ?? null, cancelFee: cancelFee.toString() });
+    this.events.toRide(ride.id, "ride.status", {
+      rideId: ride.id, status: fresh.status, version: fresh.version, at: now.toISOString(), finalFare: fresh.finalFare?.toString() ?? null, cancelFee: cancelFee.toString(),
+      paymentMethod: fresh.paymentMethod, switchedToCash: settled?.switchedToCash ?? false, cardFailure,
+    });
+    this.notifyTransition(fresh, event, actor, settled, cardFailure);
     return rideView(fresh, actor === "SYSTEM" ? "ADMIN" : actor, null);
+  }
+
+  private notifyTransition(
+    ride: Awaited<ReturnType<TripsService["load"]>>, event: TripEvent, actor: Actor,
+    settled: { switchedToCash: boolean; switchedToWallet: boolean; method: string; finalFare: bigint; rewards: RewardPaid[] } | null, cardFailure: string | null,
+  ) {
+    const data = { type: "ride", rideId: ride.id };
+    const pUser = ride.passenger.userId;
+    const dUser = ride.driver.userId;
+    const car = `${ride.vehicle.colour} ${ride.vehicle.make} ${ride.vehicle.model} · ${ride.vehicle.plateNumber}`;
+    if (event === "EN_ROUTE") this.notify.send(pUser, { category: "TRIP", title: `${ride.driver.user.firstName} is on the way`, body: car, data, channelId: "rides" });
+    if (event === "ARRIVED") this.notify.send(pUser, { category: "TRIP", title: "Your driver has arrived", body: `Look for the ${car}. Your trip PIN is in the app.`, data, channelId: "rides" });
+    if (event === "COMPLETE" && settled) {
+      const paid = settled.method === "CASH" ? "in cash" : settled.method === "WALLET" ? "from your wallet" : "by card";
+      const declined = cardFailure && settled.method !== "CARD" ? ` Your card couldn't be charged (${cardFailure}), so ` + (settled.switchedToWallet ? "we used your wallet." : "please pay the driver in cash.") : "";
+      this.notify.send(pUser, { category: "TRIP", title: "Trip complete", body: `${Money.format(settled.finalFare)} paid ${paid}.${declined} Rate your driver.`, data });
+      if (settled.switchedToCash) {
+        this.notify.send(dUser, { category: "PAYMENT", title: "Collect cash", body: `The ${cardFailure ? "card" : "wallet"} payment didn't go through. Collect ${Money.format(settled.finalFare)} in cash from ${ride.passenger.user.firstName}.`, data, channelId: "rides" });
+      }
+      for (const r of settled.rewards) this.notify.send(r.userId, { category: "PAYMENT", title: `You earned ${Money.format(r.amount)}`, body: r.text, data: { type: "wallet" } });
+    }
+    if (event === "CANCEL") {
+      const who = actor === "PASSENGER" ? "The passenger" : actor === "DRIVER" ? `${ride.driver.user.firstName}` : "Zuma support";
+      const to = actor === "PASSENGER" ? [dUser] : actor === "DRIVER" ? [pUser] : [pUser, dUser];
+      to.forEach((u) => this.notify.send(u, { category: "TRIP", title: "Trip cancelled", body: `${who} cancelled trip ${ride.code}.`, data, channelId: "rides" }));
+    }
   }
 
   async rate(rideId: string, auth: AuthContext, body: RateBody) {
@@ -200,10 +256,10 @@ export class TripsService implements OnModuleInit {
     const rides = await this.prisma.db.ride.findMany({ where: { driverId: d!.id, status: "TRIP_COMPLETED", completedAt: { gte: from } }, include: { commission: true } });
     let gross = 0n, commission = 0n, cash = 0n;
     for (const r of rides) {
-      const f = r.finalFare ?? r.agreedFare;
+      const f = r.commission?.grossFare ?? r.agreedFare;
       gross += f;
       commission += r.commission?.amount ?? 0n;
-      if (r.paymentMethod === "CASH") cash += f;
+      if (r.paymentMethod === "CASH") cash += r.finalFare ?? f;
     }
     return { period, trips: rides.length, gross: gross.toString(), commission: commission.toString(), net: (gross - commission).toString(), cashCollected: cash.toString() };
   }

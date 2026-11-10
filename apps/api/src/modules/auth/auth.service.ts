@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { normalizeNigerianPhone, type AuthTokens, type OtpRequestBody, type OtpVerifyBody } from "@zuma/contracts";
-import { createHmac, randomInt, randomUUID, timingSafeEqual } from "crypto";
+import { createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from "crypto";
+import { decrypt, sha256, verifyTotp } from "../../infra/crypto";
 import { env } from "../../config/env";
 import { DomainError, fail } from "../../common/errors";
 import type { AuthContext } from "../../common/http";
@@ -61,7 +62,7 @@ export class AuthService {
     return { otpId: id, expiresAt: new Date(Date.now() + OTP_TTL_S * 1000).toISOString(), resendAfterS: 60, appScope: body.appScope };
   }
 
-  async verifyOtp(body: OtpVerifyBody & { appScope: AuthContext["scope"] }, ip: string, userAgent?: string): Promise<AuthTokens & { isNewUser: boolean }> {
+  async verifyOtp(body: OtpVerifyBody & { appScope: AuthContext["scope"] }, ip: string, userAgent?: string): Promise<(AuthTokens & { isNewUser: boolean }) | { mfaRequired: true; mfaToken: string }> {
     const otp = await this.prisma.db.otpVerification.findUnique({ where: { id: body.otpId } });
     if (!otp || otp.consumedAt) fail("OTP_INVALID", "That code is not valid. Request a new one.");
     if (otp!.expiresAt < new Date()) fail("OTP_EXPIRED", "That code has expired. Request a new one.");
@@ -100,9 +101,48 @@ export class AuthService {
       update: { lastSeenAt: new Date(), appVersion: body.device.appVersion, model: body.device.model },
       create: { userId: user.id, installId: body.device.installId, platform: body.device.platform, model: body.device.model, appVersion: body.device.appVersion, lastSeenAt: new Date() },
     });
+    // Admins with an authenticator app: the SMS code is only the first factor.
+    if (scope === "ADMIN" && user.adminProfile?.totpEnabledAt) {
+      const mfaToken = randomBytes(24).toString("base64url");
+      await this.redis.client.set(`mfa:ticket:${mfaToken}`, JSON.stringify({ userId: user.id, deviceId: device.id }), "EX", 300);
+      return { mfaRequired: true, mfaToken };
+    }
     await this.prisma.db.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
     const tokens = await this.issue(user.id, scope, device.id, randomUUID(), null, ip, userAgent);
     return { ...tokens, isNewUser };
+  }
+
+  /** Second sign-in step for admins: a 6-digit authenticator code or a one-time recovery code. */
+  async verifyMfa(mfaToken: string, code: string, ip: string, userAgent?: string): Promise<AuthTokens & { isNewUser: false; usedRecoveryCode: boolean }> {
+    const raw = await this.redis.client.get(`mfa:ticket:${mfaToken}`);
+    if (!raw) fail("MFA_INVALID", "Your sign-in expired. Start again with your phone number.");
+    const attempts = await this.redis.client.incr(`mfa:attempts:${mfaToken}`);
+    await this.redis.client.expire(`mfa:attempts:${mfaToken}`, 300);
+    if (attempts > 5) {
+      await this.redis.client.del(`mfa:ticket:${mfaToken}`);
+      fail("OTP_ATTEMPTS_EXCEEDED", "Too many wrong codes. Start again.");
+    }
+    const { userId, deviceId } = JSON.parse(raw!) as { userId: string; deviceId: string };
+    const admin = await this.prisma.db.adminProfile.findUnique({ where: { userId } });
+    if (!admin?.totpSecretEnc || !admin.totpEnabledAt) fail("MFA_INVALID", "Two-factor is not set up for this account");
+    const clean = code.replace(/\s/g, "");
+    let usedRecoveryCode = false;
+    if (/^\d{6}$/.test(clean)) {
+      const step = verifyTotp(decrypt(admin!.totpSecretEnc!), clean);
+      if (step === null) fail("MFA_INVALID", "That code is not correct. Check your authenticator app.");
+      // Each code works once, even within its 30-second window.
+      const fresh = await this.redis.client.set(`mfa:used:${userId}:${step}`, "1", "EX", 120, "NX");
+      if (!fresh) fail("MFA_INVALID", "That code was already used. Wait for the next one.");
+    } else {
+      const h = sha256(clean.toUpperCase());
+      if (!admin!.recoveryCodesHash.includes(h)) fail("MFA_INVALID", "That recovery code is not valid");
+      await this.prisma.db.adminProfile.update({ where: { userId }, data: { recoveryCodesHash: admin!.recoveryCodesHash.filter((x) => x !== h) } });
+      usedRecoveryCode = true;
+    }
+    await this.redis.client.del(`mfa:ticket:${mfaToken}`, `mfa:attempts:${mfaToken}`);
+    await this.prisma.db.user.update({ where: { id: userId }, data: { lastLoginAt: new Date() } });
+    const tokens = await this.issue(userId, "ADMIN", deviceId, randomUUID(), null, ip, userAgent);
+    return { ...tokens, isNewUser: false, usedRecoveryCode };
   }
 
   private async issue(userId: string, scope: AuthContext["scope"], deviceId: string | null, familyId: string, parentId: string | null, ip?: string, ua?: string): Promise<AuthTokens> {

@@ -35,7 +35,7 @@ class RedisIoAdapter extends IoAdapter {
 }
 
 export async function createApp(): Promise<{ app: INestApplication; close: () => Promise<void> }> {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, { logger: env().NODE_ENV === "test" ? ["error"] : ["log", "warn", "error"] });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { logger: env().NODE_ENV === "test" ? ["error"] : ["log", "warn", "error"], rawBody: true });
   // BigInt (kobo) serialises as a string everywhere.
   app.set("json replacer", (_k: string, v: unknown) => (typeof v === "bigint" ? v.toString() : v));
   app.set("trust proxy", 1);

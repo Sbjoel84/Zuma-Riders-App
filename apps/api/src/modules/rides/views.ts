@@ -1,6 +1,7 @@
 import type { DriverRequestView, OfferView, Place, RideRequestView, RideView } from "@zuma/contracts";
 import type { Prisma } from "@zuma/database";
 import { PricingService } from "../pricing/pricing.service";
+import { PromosService } from "../promos/promos.service";
 import { areaName, maskPhone, tripPin } from "./codes";
 
 export const requestInclude = {
@@ -9,6 +10,7 @@ export const requestInclude = {
   waypoints: { orderBy: { sequence: "asc" } },
   passenger: { include: { user: true } },
   ride: { select: { id: true } },
+  promoCode: true,
   offers: {
     orderBy: { amount: "asc" },
     include: { driver: { include: { user: true } }, vehicle: { include: { category: true } } },
@@ -24,6 +26,7 @@ export const rideInclude = {
   vehicle: { include: { category: true } },
   commission: true,
   ratings: true,
+  payments: { where: { method: "CARD", status: "SUCCEEDED" }, include: { paymentMethod: true }, take: 1 },
 } satisfies Prisma.RideInclude;
 
 export type RideWithRelations = Prisma.RideGetPayload<{ include: typeof rideInclude }>;
@@ -70,6 +73,7 @@ export function requestView(r: RequestWithRelations): RideRequestView {
     expiresAt: r.expiresAt.toISOString(),
     offers: open ? r.offers.filter((o) => o.status === "PENDING" && o.expiresAt > new Date()).map(offerView) : r.offers.filter((o) => o.status === "ACCEPTED").map(offerView),
     rideId: r.ride?.id ?? null,
+    promo: r.promoCode ? { code: r.promoCode.code, description: PromosService.describe(r.promoCode) } : null,
   };
 }
 
@@ -94,7 +98,7 @@ export function driverRequestView(r: RequestWithRelations, driverId: string, dis
   };
 }
 
-export function rideView(r: RideWithRelations, viewer: "PASSENGER" | "DRIVER" | "ADMIN", driverPos: { lat: number; lng: number } | null): RideView {
+export function rideView(r: RideWithRelations, viewer: "PASSENGER" | "DRIVER" | "ADMIN", driverPos: { lat: number; lng: number } | null, unreadMessages = 0): RideView {
   const req = r.rideRequest;
   const myRating = r.ratings.find((x) => x.raterRole === viewer)?.stars ?? null;
   const pinVisible = viewer === "PASSENGER" && ["DRIVER_SELECTED", "DRIVER_EN_ROUTE", "DRIVER_ARRIVED"].includes(r.status);
@@ -106,7 +110,10 @@ export function rideView(r: RideWithRelations, viewer: "PASSENGER" | "DRIVER" | 
     agreedFare: r.agreedFare.toString(),
     finalFare: r.finalFare?.toString() ?? null,
     commissionAmount: viewer === "PASSENGER" ? null : (r.commission?.amount.toString() ?? null),
+    discountAmount: r.discountAmount.toString(),
+    passengerPays: (r.finalFare ?? r.agreedFare + r.waitingCharge - r.discountAmount).toString(),
     paymentMethod: r.paymentMethod as RideView["paymentMethod"],
+    card: viewer === "DRIVER" || !r.payments[0]?.paymentMethod ? null : { brand: r.payments[0].paymentMethod.cardBrand, last4: r.payments[0].paymentMethod.cardLast4 },
     ...places(req),
     distanceM: req.routeDistanceM,
     durationS: req.routeDurationS,
@@ -121,5 +128,6 @@ export function rideView(r: RideWithRelations, viewer: "PASSENGER" | "DRIVER" | 
     cancelledAt: r.cancelledAt?.toISOString() ?? null,
     myRating,
     shareToken: viewer === "PASSENGER" ? r.shareToken : null,
+    unreadMessages,
   };
 }

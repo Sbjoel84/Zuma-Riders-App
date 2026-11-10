@@ -7,6 +7,7 @@ import { PrismaService } from "../../infra/prisma.service";
 import { RedisService } from "../../infra/redis.service";
 import { RequirePermission } from "../auth/auth.guard";
 import { ACTIVE_RIDE_STATUSES } from "../rides/state-machine";
+import { ChatService } from "../chat/chat.service";
 import { TripsService } from "../rides/trips.service";
 import { AdminContext, lagosDayStart, lagosHour, page, pageArgs } from "./admin.support";
 
@@ -26,6 +27,7 @@ export class AdminOpsController {
     private readonly redis: RedisService,
     private readonly trips: TripsService,
     private readonly admin: AdminContext,
+    private readonly chat: ChatService,
   ) {}
 
   // ---------------- overview ----------------
@@ -183,16 +185,17 @@ export class AdminOpsController {
       where: { id },
       include: {
         rideRequest: { include: { category: true } }, passenger: { include: { user: true } }, driver: { include: { user: true } }, vehicle: true,
-        commission: true, cancellation: true, ratings: true, payments: true, receipt: true,
+        commission: true, cancellation: true, ratings: true, payments: { include: { paymentMethod: true } }, receipt: true, promoRedemption: { include: { promoCode: true } },
       },
     });
     if (!r) fail("NOT_FOUND", "Ride not found");
     const ride = r!;
-    const [negotiation, history, breadcrumbs, ledger] = await Promise.all([
+    const [negotiation, history, breadcrumbs, ledger, chat] = await Promise.all([
       db.fareNegotiation.findMany({ where: { rideRequestId: ride.rideRequestId }, orderBy: { createdAt: "asc" } }),
       db.rideStatusHistory.findMany({ where: { rideId: id }, orderBy: { createdAt: "asc" } }),
       db.rideLocation.findMany({ where: { rideId: id }, orderBy: { recordedAt: "asc" }, select: { lat: true, lng: true, recordedAt: true }, take: 2000 }),
       db.ledgerTransaction.findMany({ where: { rideId: id }, include: { entries: { include: { account: true } } }, orderBy: { postedAt: "asc" } }),
+      this.chat.transcript(id),
     ]);
     const offerDrivers = await db.rideOffer.findMany({ where: { rideRequestId: ride.rideRequestId }, include: { driver: { include: { user: true } } } });
     const nameByUser = new Map(offerDrivers.map((o) => [o.driver.userId, o.driver.user.firstName]));
@@ -208,6 +211,9 @@ export class AdminOpsController {
       suggestedFare: ride.rideRequest.suggestedFare.toString(), proposedFare: ride.rideRequest.proposedFare.toString(),
       agreedFare: ride.agreedFare.toString(), finalFare: ride.finalFare?.toString() ?? null, commission: ride.commission?.amount.toString() ?? null, commissionBps: ride.commissionBps,
       paymentMethod: ride.paymentMethod, pinAttempts: ride.pinAttempts,
+      discount: ride.discountAmount.toString(), promoCode: ride.promoRedemption?.promoCode.code ?? null,
+      payments: ride.payments.map((p) => ({ reference: p.reference, method: p.method, status: p.status, amount: p.amount.toString(), fee: p.feeAmount.toString(), card: p.paymentMethod ? `${p.paymentMethod.cardBrand ?? "card"} ••${p.paymentMethod.cardLast4 ?? ""}` : null, failureReason: p.failureReason })),
+      chat: chat.map((m) => ({ id: m.id, from: m.senderRole, body: m.body, imageUrl: m.imageUrl, flagged: m.flagged, at: m.createdAt })),
       times: { assignedAt: ride.assignedAt, arrivedAt: ride.arrivedAt, startedAt: ride.startedAt, completedAt: ride.completedAt, cancelledAt: ride.cancelledAt },
       cancellation: ride.cancellation ? { by: ride.cancellation.actorType, reason: ride.cancellation.reasonCode, text: ride.cancellation.reasonText, fee: ride.cancellation.feeAmount.toString() } : null,
       ratings: ride.ratings.map((x) => ({ by: x.raterRole, stars: x.stars, comment: x.comment })),

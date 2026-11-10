@@ -8,7 +8,8 @@ export type RideJob =
   | { name: "expand"; data: { requestId: string } }
   | { name: "expire"; data: { requestId: string } }
   | { name: "release"; data: { rideId: string } }
-  | { name: "sweep"; data: Record<string, never> };
+  | { name: "sweep"; data: Record<string, never> }
+  | { name: "payments-reconcile"; data: Record<string, never> };
 
 type Handler = (job: Job) => Promise<void>;
 
@@ -48,6 +49,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       );
       this.worker.on("failed", (job, err) => this.log.error(`Job ${job?.name}:${job?.id} failed: ${err.message}`));
       await this.queue.upsertJobScheduler("sweep-stale-drivers", { every: 30_000 }, { name: "sweep", data: {} });
+      await this.queue.upsertJobScheduler("payments-reconcile", { every: 5 * 60_000 }, { name: "payments-reconcile", data: {} });
     }
   }
 

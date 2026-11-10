@@ -33,6 +33,20 @@ import { RidesController } from "./modules/rides/rides.controller";
 import { SettlementService } from "./modules/rides/settlement.service";
 import { TripsService } from "./modules/rides/trips.service";
 import { UsersController } from "./modules/users/users.controller";
+import { MeController } from "./modules/users/me.controller";
+import { PaymentsGateway } from "./infra/payments.gateway";
+import { StorageService } from "./infra/storage.service";
+import { PaymentsController, WebhooksController } from "./modules/payments/payments.controller";
+import { PaymentsService } from "./modules/payments/payments.service";
+import { NotificationsService } from "./modules/notifications/notifications.service";
+import { FilesController } from "./modules/files/files.controller";
+import { DocumentsService } from "./modules/files/documents.service";
+import { ChatController } from "./modules/chat/chat.controller";
+import { ChatService } from "./modules/chat/chat.service";
+import { PromosService } from "./modules/promos/promos.service";
+import { ReferralsService } from "./modules/promos/referrals.service";
+import { AdminGrowthController } from "./modules/admin/admin-growth.controller";
+import { AdminSecurityController } from "./modules/admin/admin-security.controller";
 
 @Controller()
 class HealthController {
@@ -57,14 +71,17 @@ class HealthController {
 }
 
 /**
- * Single Nest module for the ride slice. Providers are grouped by the module layout in ARCHITECTURE §4 and
+ * Single Nest module. Providers are grouped by the module layout in ARCHITECTURE §4 and
  * will be split into feature modules as the remaining phases land.
  */
 @Module({
-  controllers: [HealthController, AuthController, MapsController, UsersController, DriversController, RidesController, SupportController, SafetyController,
-    AdminOpsController, AdminPeopleController, AdminFinanceController, AdminConfigController, AdminSupportController, AdminSafetyController],
+  controllers: [HealthController, AuthController, MapsController, UsersController, MeController, DriversController, RidesController, ChatController,
+    PaymentsController, WebhooksController, FilesController, SupportController, SafetyController,
+    AdminOpsController, AdminPeopleController, AdminFinanceController, AdminConfigController, AdminSupportController, AdminSafetyController,
+    AdminGrowthController, AdminSecurityController],
   providers: [
-    PrismaService, RedisService, SmsService, MapsService,
+    PrismaService, RedisService, SmsService, MapsService, PaymentsGateway, StorageService,
+    NotificationsService, PaymentsService, DocumentsService, ChatService, PromosService, ReferralsService,
     TokensService, AuthService,
     WalletService, LedgerService, WithdrawalsService, AdminContext,
     EventsService, RealtimeGateway,

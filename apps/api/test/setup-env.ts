@@ -12,3 +12,12 @@ process.env.MATCH_EXPAND_AFTER_S = "1";
 process.env.EARNINGS_HOLD_S = "1";
 process.env.OTP_LIMIT_PER_IP_HOUR = "1000";
 process.env.OTP_LIMIT_PER_PHONE_10MIN = "20";
+process.env.PAYMENTS_PROVIDER = "fake";
+process.env.FAKE_PAYMENTS_AUTO_WEBHOOK = "false";
+process.env.PUSH_PROVIDER = "console";
+process.env.STORAGE_PROVIDER = "local";
+process.env.STORAGE_LOCAL_DIR = require("path").join(require("os").tmpdir(), "zuma-test-uploads");
+// Most suites approve drivers without uploading documents; documents.e2e turns this on.
+process.env.DRIVER_DOCS_REQUIRED = "false";
+process.env.ADMIN_2FA_REQUIRED = "false";
+process.env.PUBLIC_API_URL = "http://127.0.0.1:4000";

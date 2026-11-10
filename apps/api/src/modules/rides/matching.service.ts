@@ -4,6 +4,8 @@ import { haversineM } from "../../infra/maps.service";
 import { PrismaService } from "../../infra/prisma.service";
 import { RedisService } from "../../infra/redis.service";
 import { AvailabilityService, geoKey } from "../geo/availability.service";
+import { Money } from "@zuma/contracts";
+import { NotificationsService } from "../notifications/notifications.service";
 import { EventsService } from "../realtime/events.service";
 import { JobsService } from "./jobs.service";
 import { OPEN_REQUEST_STATUSES } from "./state-machine";
@@ -36,6 +38,7 @@ export class MatchingService implements OnModuleInit {
     private readonly availability: AvailabilityService,
     private readonly events: EventsService,
     private readonly jobs: JobsService,
+    private readonly notify: NotificationsService,
   ) {}
 
   onModuleInit() {
@@ -107,7 +110,20 @@ export class MatchingService implements OnModuleInit {
 
     if (picked.length) {
       const full = await this.prisma.db.rideRequest.findUniqueOrThrow({ where: { id: requestId }, include: requestInclude });
-      for (const p of picked) this.events.toDriver(p.driverId, "ride_request.new", driverRequestView(full, p.driverId, p.distanceM));
+      const drivers = await this.prisma.db.driver.findMany({ where: { id: { in: picked.map((p) => p.driverId) } }, select: { id: true, userId: true } });
+      for (const p of picked) {
+        const view = driverRequestView(full, p.driverId, p.distanceM);
+        this.events.toDriver(p.driverId, "ride_request.new", view);
+        // Push too, so a driver with the app in the background (but online) still hears the request.
+        const userId = drivers.find((d) => d.id === p.driverId)?.userId;
+        if (userId) {
+          this.notify.send(userId, {
+            category: "TRIP", title: `New request · ${Money.format(full.proposedFare)}`, channelId: "rides", inbox: false,
+            body: `${view.pickup.area} → ${view.dropoffArea} · ${(p.distanceM / 1000).toFixed(1)} km to pickup`,
+            data: { type: "request", requestId },
+          });
+        }
+      }
     }
     return picked.length;
   }

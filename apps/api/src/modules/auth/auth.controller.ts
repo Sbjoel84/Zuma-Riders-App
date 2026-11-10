@@ -6,6 +6,7 @@ import { Public } from "./auth.guard";
 import { AuthService } from "./auth.service";
 
 const VerifyBody = OtpVerifyBody.extend({ appScope: AppScope });
+const MfaBody = z.object({ mfaToken: z.string().min(20), code: z.string().trim().min(6).max(20) });
 
 @Controller("v1/auth")
 export class AuthController {
@@ -23,6 +24,13 @@ export class AuthController {
   @HttpCode(200)
   verify(@Body(new ZodPipe(VerifyBody)) body: z.infer<typeof VerifyBody>, @ClientIp() ip: string, @Headers("user-agent") ua?: string) {
     return this.auth.verifyOtp(body, ip, ua);
+  }
+
+  @Public()
+  @Post("mfa/verify")
+  @HttpCode(200)
+  mfa(@Body(new ZodPipe(MfaBody)) body: z.infer<typeof MfaBody>, @ClientIp() ip: string, @Headers("user-agent") ua?: string) {
+    return this.auth.verifyMfa(body.mfaToken, body.code, ip, ua);
   }
 
   @Public()
