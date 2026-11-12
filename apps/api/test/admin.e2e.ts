@@ -186,7 +186,7 @@ describe("admin API", () => {
     const seen = await P.get(`/v1/support/tickets/${tk.body.id}`).expect(200);
     expect(seen.body.status).toBe("AWAITING_USER");
     expect(seen.body.messages).toHaveLength(2); // internal note hidden from the customer
-    expect(seen.body.messages[1]).toMatchObject({ fromSupport: true, author: "Zuma Support" });
+    expect(seen.body.messages[1]).toMatchObject({ fromSupport: true, author: "Riders App Support" });
     await A.post(`/v1/admin/support/tickets/${tk.body.id}/status`, { status: "RESOLVED", resolution: "Reversal confirmed" }).expect(200);
     const detail = await A.get(`/v1/admin/support/tickets/${tk.body.id}`).expect(200);
     expect(detail.body).toMatchObject({ status: "RESOLVED", assignee: { name: "Ops Lead" } });

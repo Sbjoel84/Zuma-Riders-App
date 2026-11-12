@@ -29,7 +29,7 @@ export function Safety() {
     <>
       <PageHeader title="Safety" subtitle="SOS alerts and safety reports. This page refreshes every 5 seconds." actions={<Chips label="Incidents" value={filter} onChange={setFilter} options={[{ value: "open", label: "Open" }, { value: "all", label: "All, last 100" }]} />} />
       <p className="rounded-[12px] bg-amber-soft px-4 py-3 text-sm text-amber-text">
-        Zuma does not contact police or ambulance automatically. When a rider presses SOS, their app shows 112 and 199 to call. Riders are told emergency services were contacted only after you record it here.
+        Riders App does not contact police or ambulance automatically. When a rider presses SOS, their app shows 112 and 199 to call. Riders are told emergency services were contacted only after you record it here.
       </p>
       <Async q={q} loading="Loading incidents…">
         {(list) =>

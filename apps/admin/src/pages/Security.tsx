@@ -62,7 +62,7 @@ export function Security({ enrolOnly = false }: { enrolOnly?: boolean }) {
     });
 
   const download = () => {
-    const blob = new Blob([`Zuma Admin recovery codes\nEach code works once.\n\n${codes!.join("\n")}\n`], { type: "text/plain" });
+    const blob = new Blob([`Riders App Admin recovery codes\nEach code works once.\n\n${codes!.join("\n")}\n`], { type: "text/plain" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = "zuma-admin-recovery-codes.txt";
@@ -100,12 +100,12 @@ export function Security({ enrolOnly = false }: { enrolOnly?: boolean }) {
                     <Button disabled={code.length !== 6} loading={busy} onClick={regenerate}>Get new recovery codes</Button>
                     {!s.required ? <Button kind="danger" disabled={code.length !== 6} loading={busy} onClick={disable}>Turn off</Button> : null}
                   </div>
-                  {s.required ? <p className="text-xs text-muted">Two-factor sign-in is required for all Zuma admins. If you change phones, ask a super admin to reset it from Settings.</p> : null}
+                  {s.required ? <p className="text-xs text-muted">Two-factor sign-in is required for all Riders App admins. If you change phones, ask a super admin to reset it from Settings.</p> : null}
                 </>
               ) : setup ? (
                 <div className="grid gap-4 sm:grid-cols-[220px_1fr]">
                   <div className="flex flex-col items-center gap-2">
-                    {qr ? <img src={qr} alt="QR code to add Zuma Admin to your authenticator app" className="size-[220px] rounded-[10px] border border-line-soft" /> : <div className="size-[220px] rounded-[10px] bg-line-soft" />}
+                    {qr ? <img src={qr} alt="QR code to add Riders App Admin to your authenticator app" className="size-[220px] rounded-[10px] border border-line-soft" /> : <div className="size-[220px] rounded-[10px] bg-line-soft" />}
                   </div>
                   <div className="flex flex-col gap-3">
                     <ol className="list-decimal pl-5 text-sm leading-relaxed">
@@ -146,9 +146,9 @@ export function Security({ enrolOnly = false }: { enrolOnly?: boolean }) {
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-5 px-4 py-10">
       <div>
-        <span className="font-display text-2xl font-bold">zuma <span className="ml-1 rounded-md bg-amber px-2 py-0.5 align-middle text-xs tracking-wider text-ink uppercase">Ops</span></span>
+        <span className="font-display text-2xl font-bold">Riders App <span className="ml-1 rounded-md bg-amber px-2 py-0.5 align-middle text-xs tracking-wider text-ink uppercase">Ops</span></span>
         <h1 className="mt-6 font-display text-3xl font-bold">Set up two-factor sign-in</h1>
-        <p className="mt-1 text-sm text-muted">Zuma requires an authenticator app for all admin accounts. It takes about a minute.</p>
+        <p className="mt-1 text-sm text-muted">Riders App requires an authenticator app for all admin accounts. It takes about a minute.</p>
       </div>
       {body}
       <div><Button kind="ghost" onClick={signOut}>Sign out</Button></div>

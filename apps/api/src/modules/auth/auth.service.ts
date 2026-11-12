@@ -51,7 +51,7 @@ export class AuthService {
     const code = randomInt(0, 1_000_000).toString().padStart(6, "0");
     const id = randomUUID();
     const user = await this.prisma.db.user.findUnique({ where: { phoneE164: phone }, select: { id: true } });
-    const sent = await this.sms.send(phone, `Your Zuma code is ${code}. It expires in 5 minutes. Never share it with anyone.`);
+    const sent = await this.sms.send(phone, `Your Riders App code is ${code}. It expires in 5 minutes. Never share it with anyone.`);
     await this.prisma.db.otpVerification.create({
       data: {
         id, userId: user?.id, phoneE164: phone, purpose: user ? "LOGIN" : "SIGNUP", codeHash: this.hashOtp(id, code),

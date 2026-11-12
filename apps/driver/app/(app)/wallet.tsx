@@ -130,7 +130,7 @@ export default function Wallet() {
             <View style={{ gap: 6 }}>
               <Row style={{ justifyContent: "space-between" }}><Muted>Trips</Muted><Txt variant="label">{earnings.data.trips}</Txt></Row>
               <Row style={{ justifyContent: "space-between" }}><Muted>Fares</Muted><Txt variant="label">{naira(earnings.data.gross)}</Txt></Row>
-              <Row style={{ justifyContent: "space-between" }}><Muted>Zuma commission</Muted><Txt variant="label">−{naira(earnings.data.commission)}</Txt></Row>
+              <Row style={{ justifyContent: "space-between" }}><Muted>Riders App commission</Muted><Txt variant="label">−{naira(earnings.data.commission)}</Txt></Row>
               <Row style={{ justifyContent: "space-between" }}><Txt variant="label">You earned</Txt><Txt variant="heading">{naira(earnings.data.net)}</Txt></Row>
               <Muted>Cash collected from passengers: {naira(earnings.data.cashCollected)}</Muted>
             </View>

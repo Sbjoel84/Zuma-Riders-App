@@ -60,7 +60,7 @@ export default function Home() {
           <Pressable accessibilityRole="button" accessibilityLabel="Account and settings" onPress={() => router.push("/(app)/account")} style={styles.roundBtn}>
             <Txt variant="label">{(me?.firstName?.[0] ?? "Z").toUpperCase()}</Txt>
           </Pressable>
-          <View style={styles.brand}><Txt variant="heading" color="#fff">zuma</Txt></View>
+          <View style={styles.brand}><Txt variant="heading" color="#fff">Riders App</Txt></View>
           <Pressable accessibilityRole="button" onPress={() => router.push("/(app)/wallet")} style={[styles.roundBtn, { width: "auto", paddingHorizontal: 14 }]} accessibilityLabel={`Wallet balance ${naira(wallet.data?.availableBalance)}. Open wallet`}>
             <Txt variant="label">{wallet.data ? naira(wallet.data.availableBalance) : "₦—"}</Txt>
           </Pressable>
@@ -71,7 +71,7 @@ export default function Home() {
         <View style={styles.handle} />
         <Txt variant="title">Where to, {me?.firstName || "there"}?</Txt>
         {permission === "denied" ? <Banner tone="amber" text="Location is off. Set your pickup by searching for it." /> : null}
-        {nearby.data && !nearby.data.inServiceArea ? <Banner tone="amber" text="You're outside our service area. Zuma is live in Abuja." /> : null}
+        {nearby.data && !nearby.data.inServiceArea ? <Banner tone="amber" text="You're outside our service area. Riders App is live in Abuja." /> : null}
 
         <Pressable accessibilityRole="button" onPress={() => { setEditing("pickup"); router.push("/(app)/search"); }} style={styles.field}>
           <View style={styles.dotPickup} />

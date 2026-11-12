@@ -86,7 +86,7 @@ export function TripChat({ rideId, quickReplies, onBack }: { rideId: string; qui
           </Pressable>
           <View style={{ flex: 1 }}>
             <Txt variant="heading">{q.data?.otherName ?? "Chat"}</Txt>
-            <Muted>Messages stay in Zuma. Don't share bank details or passwords.</Muted>
+            <Muted>Messages stay in Riders App. Don't share bank details or passwords.</Muted>
           </View>
         </Row>
         <FlatList

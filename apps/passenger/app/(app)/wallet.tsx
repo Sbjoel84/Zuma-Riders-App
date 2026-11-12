@@ -66,7 +66,7 @@ export default function Wallet() {
           <Field label="Or enter an amount (₦)" value={custom} onChangeText={setCustom} keyboardType="numeric" placeholder="e.g. 3500" />
           {msg ? <Banner tone={msg.tone} text={msg.text} /> : null}
           <Button title={`Top up ${naira(kobo)}`} onPress={topUp} loading={busy} />
-          <Muted center>Payments are processed securely by Paystack. Zuma never sees your card number.</Muted>
+          <Muted center>Payments are processed securely by Paystack. Riders App never sees your card number.</Muted>
         </View>
 
         <View style={{ gap: space.sm }}>

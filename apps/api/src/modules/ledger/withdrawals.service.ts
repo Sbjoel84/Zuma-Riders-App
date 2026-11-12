@@ -125,7 +125,7 @@ export class WithdrawalsService {
     if (!claimed.count) fail("INVALID_STATE_TRANSITION", "This withdrawal is not waiting to be sent");
     const wd = await this.prisma.db.withdrawal.findUniqueOrThrow({ where: { id } });
     try {
-      const t = await this.gateway.transfer({ amount: wd.amount, recipientCode: wd.recipientCode, reference: WithdrawalsService.transferRef(wd.id), reason: "Zuma driver earnings" });
+      const t = await this.gateway.transfer({ amount: wd.amount, recipientCode: wd.recipientCode, reference: WithdrawalsService.transferRef(wd.id), reason: "Riders App driver earnings" });
       await this.prisma.db.withdrawal.update({ where: { id }, data: { providerRef: t.transferCode } });
       if (t.status === "success") await this.onTransferResult(WithdrawalsService.transferRef(wd.id), "success", "immediate");
       if (t.status === "failed") await this.onTransferResult(WithdrawalsService.transferRef(wd.id), "failed", "Transfer failed");

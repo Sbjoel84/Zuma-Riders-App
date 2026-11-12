@@ -68,7 +68,7 @@ export default function Home() {
   useServerEvent<{ reason: string }>("driver.forced_offline", (e) => {
     setOnline(false);
     stopTracking().catch(() => undefined);
-    setError(e.reason === "HEARTBEAT_LOST" ? "You went offline because we lost your location. Go online again." : "You were taken offline by Zuma. Check your account status.");
+    setError(e.reason === "HEARTBEAT_LOST" ? "You went offline because we lost your location. Go online again." : "You were taken offline by Riders App. Check your account status.");
   });
 
   if (current.data?.ride) return <Redirect href={{ pathname: "/(app)/trip/[id]", params: { id: current.data.ride.id } }} />;
@@ -87,8 +87,8 @@ export default function Home() {
         if (perm === "denied") throw new Error("Location permission is needed to go online. Turn it on in Settings.");
         const pos = await currentPosition();
         await api.post("/v1/driver/availability/online", pos);
-        await startTracking().catch(() => setNotice(perm === "foreground-only" ? "Keep Zuma open: background location is off, so you'll go offline if you leave the app." : null));
-        if (perm === "foreground-only") setNotice("Keep Zuma open: background location is off, so you'll go offline if you leave the app.");
+        await startTracking().catch(() => setNotice(perm === "foreground-only" ? "Keep Riders App open: background location is off, so you'll go offline if you leave the app." : null));
+        if (perm === "foreground-only") setNotice("Keep Riders App open: background location is off, so you'll go offline if you leave the app.");
         setOnline(true);
         requests.refetch();
       }

@@ -81,7 +81,7 @@ export default function Onboarding() {
   return (
     <Screen>
       <ScrollView contentContainerStyle={{ gap: space.lg, paddingVertical: space.xl }} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={driver.isFetching} onRefresh={() => { driver.refetch(); }} tintColor="#f2a900" />}>
-        <Txt variant="title">Become a Zuma driver</Txt>
+        <Txt variant="title">Become a Riders App driver</Txt>
         <Row gap={space.sm}>
           <Pill label="1 Details" tone={d ? "green" : "amber"} />
           <Pill label="2 Vehicle" tone={d?.vehicles.length ? "green" : d ? "amber" : "neutral"} />

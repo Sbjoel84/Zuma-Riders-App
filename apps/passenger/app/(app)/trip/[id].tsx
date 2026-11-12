@@ -71,7 +71,7 @@ export default function Trip() {
     try {
       const r = await api.post<{ url: string; contactsNotified: number }>(`/v1/rides/${id}/share`, { notifyContacts: true });
       setShared(r.contactsNotified ? `Texted a live link to ${r.contactsNotified} emergency contact${r.contactsNotified > 1 ? "s" : ""}.` : "Link ready.");
-      await Share.share({ message: `Follow my Zuma trip live: ${r.url}` });
+      await Share.share({ message: `Follow my Riders App trip live: ${r.url}` });
     } catch (e) {
       setError(errorMessage(e));
     }
@@ -158,7 +158,7 @@ export default function Trip() {
               </View>
               <Txt variant="title">{naira(r.passengerPays)}</Txt>
             </Row>
-            {BigInt(r.discountAmount) > 0n ? <Muted>{naira(r.agreedFare)} fare − {naira(r.discountAmount)} promo, paid by Zuma</Muted> : null}
+            {BigInt(r.discountAmount) > 0n ? <Muted>{naira(r.agreedFare)} fare − {naira(r.discountAmount)} promo, paid by Riders App</Muted> : null}
             <Muted>{km(r.distanceM)} trip · fare locked when you accepted</Muted>
           </Card>
 

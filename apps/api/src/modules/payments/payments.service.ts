@@ -158,7 +158,7 @@ export class PaymentsService implements OnModuleInit {
       const owner: WalletOwnerType = p.purpose === "COMMISSION_SETTLEMENT" ? "DRIVER" : "PASSENGER";
       await this.ledger.post(tx, {
         type: "WALLET_TOPUP", idempotencyKey: late ? `card-late:${p.id}` : `topup:${p.id}`,
-        description: late ? `Card charge ${p.reference} credited to wallet` : owner === "DRIVER" ? "Paid towards Zuma commission" : "Wallet top-up by card",
+        description: late ? `Card charge ${p.reference} credited to wallet` : owner === "DRIVER" ? "Paid towards Riders App commission" : "Wallet top-up by card",
         paymentId: p.id, createdByType: "SYSTEM",
         entries: [
           { accountId: await this.wallets.systemAccountId("PAYSTACK_CLEARING", tx), direction: "DEBIT", amount: p.amount },
@@ -170,7 +170,7 @@ export class PaymentsService implements OnModuleInit {
     });
 
     if (outcome.notify === "ok") {
-      this.notify.send(p.userId, { category: "PAYMENT", title: "Wallet topped up", body: `${Money.format(p.amount)} was added to your Zuma wallet.`, data: { type: "wallet" } });
+      this.notify.send(p.userId, { category: "PAYMENT", title: "Wallet topped up", body: `${Money.format(p.amount)} was added to your Riders App wallet.`, data: { type: "wallet" } });
     } else if (outcome.notify === "late") {
       this.notify.send(p.userId, { category: "PAYMENT", title: "Card payment received", body: `Your card payment of ${Money.format(p.amount)} went through after the trip, so we added it to your wallet.`, data: { type: "wallet" } });
     } else if (outcome.notify === "failed" && p.purpose !== "RIDE_FARE") {

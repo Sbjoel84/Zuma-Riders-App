@@ -184,7 +184,7 @@ describe("documents, chat, push and safety contacts", () => {
     expect(share.body.contactsNotified).toBe(2);
     expect(t.smsTo("08095550001").at(-1)?.body).toContain("ABJ 921 SS");
     const page = await t.http().get(new URL(share.body.url).pathname).expect(200);
-    expect(page.text).toContain("Amaka is on a Zuma trip");
+    expect(page.text).toContain("Amaka is on a Riders App trip");
     expect(page.text).toContain("ABJ 921 SS");
     expect(page.text).not.toContain("0803"); // no phone numbers on the public page
 

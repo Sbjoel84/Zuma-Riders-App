@@ -147,7 +147,7 @@ export class AdminPeopleController {
       await tx.driverVerification.create({ data: { driverId: id, fromStatus: d!.verificationStatus, toStatus: "APPROVED", reviewerId: adminId } });
       await this.admin.action(adminId, "drivers.approve", "Driver", id, undefined, tx);
     });
-    this.notify.send(d!.userId, { category: "ACCOUNT", title: "You're approved to drive", body: "Welcome to Zuma. Go online to start receiving ride requests.", data: { type: "home" } });
+    this.notify.send(d!.userId, { category: "ACCOUNT", title: "You're approved to drive", body: "Welcome to Riders App. Go online to start receiving ride requests.", data: { type: "home" } });
     return { id, verificationStatus: "APPROVED" };
   }
 

@@ -42,7 +42,7 @@ export class SafetyController {
         ? ` They were driving trip ${ride.code} with rider ${ride.passenger.user.firstName}.`
         : ` They were in a ${ride.vehicle.colour} ${ride.vehicle.make} ${ride.vehicle.model} ${ride.vehicle.plateNumber}, driver ${ride.driver.user.firstName}.`
       : "";
-    const body = `URGENT: ${me.firstName} ${me.lastName} pressed SOS in the Zuma app at ${time}.${trip} Location: https://maps.google.com/?q=${lat.toFixed(5)},${lng.toFixed(5)} . Try to reach them. If you can't, call 112.`;
+    const body = `URGENT: ${me.firstName} ${me.lastName} pressed SOS in the Riders App app at ${time}.${trip} Location: https://maps.google.com/?q=${lat.toFixed(5)},${lng.toFixed(5)} . Try to reach them. If you can't, call 112.`;
     let sent = 0;
     for (const c of contacts) await this.sms.send(c.phoneE164, body).then(() => sent++).catch(() => undefined);
     await this.prisma.db.safetyIncident.update({ where: { id: incidentId }, data: { contactsNotifiedAt: new Date() } });

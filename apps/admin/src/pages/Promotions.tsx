@@ -28,7 +28,7 @@ export function Promotions() {
   const [tab, setTab] = useState("promos");
   return (
     <>
-      <PageHeader title="Promotions" subtitle="Promo codes and referral rewards. Zuma pays every discount: drivers always earn on the full agreed fare." actions={<Chips label="View" value={tab} onChange={setTab} options={[{ value: "promos", label: "Promo codes" }, { value: "referrals", label: "Referrals" }]} />} />
+      <PageHeader title="Promotions" subtitle="Promo codes and referral rewards. Riders App pays every discount: drivers always earn on the full agreed fare." actions={<Chips label="View" value={tab} onChange={setTab} options={[{ value: "promos", label: "Promo codes" }, { value: "referrals", label: "Referrals" }]} />} />
       {tab === "promos" ? <PromoList /> : <ReferralList />}
     </>
   );

@@ -60,7 +60,7 @@ export async function startTracking() {
     pausesUpdatesAutomatically: false,
     showsBackgroundLocationIndicator: true,
     foregroundService: {
-      notificationTitle: "You're online on Zuma",
+      notificationTitle: "You're online on Riders App",
       notificationBody: "Sharing your location to receive ride requests.",
       notificationColor: "#f2a900",
     },

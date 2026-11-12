@@ -51,7 +51,7 @@ export function Layout() {
     <div className="flex min-h-full">
       <aside className={clsx("fixed inset-y-0 left-0 z-40 flex w-[232px] flex-col gap-5 bg-ink px-4 py-6 text-[#f1f3ee] transition-transform lg:static lg:translate-x-0", open ? "translate-x-0" : "-translate-x-full")}>
         <div className="flex items-center justify-between">
-          <span className="font-display text-[22px] font-bold">zuma</span>
+          <span className="font-display text-[22px] font-bold">Riders App</span>
           <span className="rounded-md bg-amber px-2 py-0.5 text-[11px] font-bold tracking-wider text-ink uppercase">Ops</span>
           <button className="cursor-pointer text-[#c9cec7] lg:hidden" onClick={() => setOpen(false)} aria-label="Close menu"><X className="size-5" /></button>
         </div>
@@ -88,7 +88,7 @@ export function Layout() {
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-center justify-between gap-3 border-b border-line bg-white px-4 py-2.5 lg:hidden">
           <button onClick={() => setOpen(true)} className="cursor-pointer" aria-label="Open menu"><Menu className="size-6" /></button>
-          <span className="font-display font-bold">zuma ops</span>
+          <span className="font-display font-bold">Riders App ops</span>
           <span className="w-6" />
         </div>
         {sos > 0 && !loc.pathname.startsWith("/safety") && can("safety:write") ? (

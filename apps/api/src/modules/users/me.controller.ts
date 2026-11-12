@@ -145,7 +145,7 @@ export class MeController {
       const contacts = await this.prisma.db.emergencyContact.findMany({ where: { userId: auth.userId, deletedAt: null } });
       const me = ride!.passenger.user;
       for (const c of contacts) {
-        await this.sms.send(c.phoneE164, `${me.firstName} shared a Zuma trip with you: ${ride!.vehicle.colour} ${ride!.vehicle.make} ${ride!.vehicle.model} ${ride!.vehicle.plateNumber}, driver ${ride!.driver.user.firstName}. Follow it live: ${url}`).then(() => notified++).catch(() => undefined);
+        await this.sms.send(c.phoneE164, `${me.firstName} shared a Riders App trip with you: ${ride!.vehicle.colour} ${ride!.vehicle.make} ${ride!.vehicle.model} ${ride!.vehicle.plateNumber}, driver ${ride!.driver.user.firstName}. Follow it live: ${url}`).then(() => notified++).catch(() => undefined);
       }
     }
     return { url, contactsNotified: notified };
@@ -164,7 +164,7 @@ export class MeController {
     const pos = await this.availability.position(ride.driverId);
     const status: Record<string, string> = { DRIVER_SELECTED: "Driver assigned", DRIVER_EN_ROUTE: "Driver on the way to pickup", DRIVER_ARRIVED: "Driver at pickup", TRIP_STARTED: "On the trip" };
     const where = pos ? `<a class="b" href="https://www.google.com/maps/search/?api=1&query=${pos.lat},${pos.lng}">See the car's location on a map</a><p class="muted">Location updated live. This page refreshes every 20 seconds.</p>` : `<p class="muted">Live location not available right now.</p>`;
-    return res.send(sharePage(`${esc(ride.passenger.user.firstName)} is on a Zuma trip`, `
+    return res.send(sharePage(`${esc(ride.passenger.user.firstName)} is on a Riders App trip`, `
       <p class="pill">${status[ride.status] ?? ride.status}</p>
       <dl><dt>Car</dt><dd>${esc(`${ride.vehicle.colour} ${ride.vehicle.make} ${ride.vehicle.model}`)} · <b>${esc(ride.vehicle.plateNumber)}</b></dd>
       <dt>Driver</dt><dd>${esc(ride.driver.user.firstName)} · ★ ${ride.driver.ratingAvg.toString()}</dd>

@@ -13,7 +13,7 @@ interface SosResult {
 }
 
 /**
- * SOS: alerts the Zuma safety team with the rider's location and offers direct calls to emergency numbers.
+ * SOS: alerts the Riders App safety team with the rider's location and offers direct calls to emergency numbers.
  * It says emergency services were contacted only when the server reports that an operator recorded it.
  */
 export default function Sos() {
@@ -54,16 +54,16 @@ export default function Sos() {
     <Screen>
       <View style={{ flex: 1, justifyContent: "center", gap: space.lg }}>
         <Txt variant="display" color={colors.red}>Emergency</Txt>
-        {state === "sending" ? <Loading label="Alerting the Zuma safety team…" /> : null}
+        {state === "sending" ? <Loading label="Alerting the Riders App safety team…" /> : null}
         {state === "sent" ? (
-          <Banner tone="green" text={result?.emergencyServicesContacted ? "The Zuma safety team has contacted emergency services and is following your trip." : "The Zuma safety team has your location and will call you shortly. Zuma has not contacted the police or an ambulance. Call them now if you are in danger."} />
+          <Banner tone="green" text={result?.emergencyServicesContacted ? "The Riders App safety team has contacted emergency services and is following your trip." : "The Riders App safety team has your location and will call you shortly. Riders App has not contacted the police or an ambulance. Call them now if you are in danger."} />
         ) : null}
         {state === "sent" && result?.contactsNotified ? <Muted variant="body">We texted your location to {result.contactsNotified} emergency contact{result.contactsNotified > 1 ? "s" : ""}.</Muted> : null}
         {state === "sent" && result && !result.contactsNotified ? <Button title="Add emergency contacts for next time" kind="ghost" onPress={() => router.push("/(app)/contacts")} /> : null}
         {state === "failed" ? (
           <>
-            <Banner text={`We couldn't reach Zuma: ${error}. Call emergency services directly.`} />
-            <Button title="Try alerting Zuma again" kind="secondary" onPress={send} />
+            <Banner text={`We couldn't reach Riders App: ${error}. Call emergency services directly.`} />
+            <Button title="Try alerting Riders App again" kind="secondary" onPress={send} />
           </>
         ) : null}
         <Card style={{ gap: space.md }}>

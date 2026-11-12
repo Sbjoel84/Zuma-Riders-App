@@ -8,7 +8,7 @@ import { ACTIVE_RIDE_STATUSES } from "../rides/state-machine";
 type CodeWithPromotion = PromoCode & { promotion: Promotion };
 
 /**
- * Promo codes. Zuma funds the discount: the passenger pays agreed fare − discount, the driver still
+ * Promo codes. Riders App funds the discount: the passenger pays agreed fare − discount, the driver still
  * earns on the full agreed fare, and the difference is booked to PROMO_EXPENSE at settlement.
  *  - validated when the passenger books (so they see it before searching),
  *  - priced when they accept an offer (the discount is fixed on the ride with the agreed fare),

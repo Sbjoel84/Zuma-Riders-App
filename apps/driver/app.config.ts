@@ -1,9 +1,9 @@
 import type { ExpoConfig } from "expo/config";
 
-const LOCATION_COPY = "Zuma Driver uses your location to send you nearby ride requests and to share your position with your passenger during a trip.";
+const LOCATION_COPY = "Riders App Driver uses your location to send you nearby ride requests and to share your position with your passenger during a trip.";
 
 const config: ExpoConfig = {
-  name: "Zuma Driver",
+  name: "Riders App Driver",
   slug: "zuma-driver",
   scheme: "zumadriver",
   version: "0.1.0",
@@ -31,7 +31,7 @@ const config: ExpoConfig = {
     ["expo-splash-screen", { image: "./assets/splash-icon.png", imageWidth: 160, resizeMode: "contain", backgroundColor: "#12161b" }],
     ["expo-location", { locationAlwaysAndWhenInUsePermission: LOCATION_COPY, isAndroidBackgroundLocationEnabled: true, isAndroidForegroundServiceEnabled: true }],
     ["expo-notifications", { color: "#f2a900" }],
-    ["expo-image-picker", { cameraPermission: "Zuma Driver uses the camera to photograph your licence, vehicle papers and car for verification.", photosPermission: "Choose photos of your documents for verification." }],
+    ["expo-image-picker", { cameraPermission: "Riders App Driver uses the camera to photograph your licence, vehicle papers and car for verification.", photosPermission: "Choose photos of your documents for verification." }],
     "expo-web-browser",
   ],
   extra: { apiUrl: process.env.EXPO_PUBLIC_API_URL, eas: { projectId: process.env.EAS_PROJECT_ID } },

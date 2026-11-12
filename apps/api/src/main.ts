@@ -5,7 +5,7 @@ import { env } from "./config/env";
 async function main() {
   const { app } = await createApp();
   await app.listen(env().PORT, "0.0.0.0");
-  new Logger("Bootstrap").log(`Zuma API listening on :${env().PORT} (${env().NODE_ENV}, maps=${env().MAPS_PROVIDER}, sms=${env().SMS_PROVIDER})`);
+  new Logger("Bootstrap").log(`Riders App API listening on :${env().PORT} (${env().NODE_ENV}, maps=${env().MAPS_PROVIDER}, sms=${env().SMS_PROVIDER})`);
 }
 
 main().catch((e) => {

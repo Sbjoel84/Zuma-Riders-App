@@ -26,7 +26,7 @@ export interface SettlementResult {
 /**
  * Books the money side of a completed trip inside the completion transaction.
  *  - CASH:   driver already holds what the passenger paid; the ledger books the commission the driver owes,
- *            minus any promo discount Zuma owes the driver.
+ *            minus any promo discount Riders App owes the driver.
  *  - WALLET: passenger wallet (+ promo expense) → driver pending (gross − commission) + commission revenue.
  *  - CARD:   Paystack clearing (+ promo expense) → driver pending + commission revenue; Paystack fee expensed.
  * A card that couldn't be charged falls back to the wallet if it covers the fare, otherwise to cash.
@@ -98,7 +98,7 @@ export class SettlementService {
     const posted = await this.ledger.post(tx, {
       type: method === "CASH" ? "RIDE_CASH_COMMISSION" : method === "WALLET" ? "RIDE_PAYMENT_WALLET" : "RIDE_PAYMENT_CARD",
       idempotencyKey: `commission:${rideId}`,
-      description: method === "CASH" ? `Commission on cash trip ${ride.code}${discount ? ` (promo ${Money.format(discount)} paid by Zuma)` : ""}` : `Trip ${ride.code}`,
+      description: method === "CASH" ? `Commission on cash trip ${ride.code}${discount ? ` (promo ${Money.format(discount)} paid by Riders App)` : ""}` : `Trip ${ride.code}`,
       rideId, paymentId: payment.id, createdByType: "SYSTEM", entries,
     });
 

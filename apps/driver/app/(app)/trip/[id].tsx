@@ -112,7 +112,7 @@ export default function DriverTrip() {
           </Row>
 
           {r.paymentMethod === "CASH" && BigInt(r.discountAmount) > 0n ? (
-            <Muted style={{ color: colors.muted }}>{r.passenger.firstName} has a promo: collect {naira(r.passengerPays)} in cash. Zuma adds the {naira(r.discountAmount)} discount to your wallet, so you still earn on {naira(r.agreedFare)}.</Muted>
+            <Muted style={{ color: colors.muted }}>{r.passenger.firstName} has a promo: collect {naira(r.passengerPays)} in cash. Riders App adds the {naira(r.discountAmount)} discount to your wallet, so you still earn on {naira(r.agreedFare)}.</Muted>
           ) : null}
           <Row gap={space.sm}>
             <Button title={`Navigate to ${r.status === "TRIP_STARTED" ? "destination" : "pickup"}`} kind="secondary" style={{ flex: 1 }} onPress={() => navigate(target.lat, target.lng)} />
@@ -180,10 +180,10 @@ function TripSummary({ ride, onDone }: { ride: RideView; onDone: () => void }) {
             <Txt variant="display">{ride.paymentMethod === "CASH" ? `Collect ${naira(collect)}` : naira(fare)}</Txt>
             <Card>
               <Row style={{ justifyContent: "space-between" }}><Muted>Fare</Muted><Txt variant="label">{naira(fare)}</Txt></Row>
-              {discount > 0n ? <Row style={{ justifyContent: "space-between" }}><Muted>Promo paid by Zuma</Muted><Txt variant="label">{naira(discount)}</Txt></Row> : null}
-              <Row style={{ justifyContent: "space-between" }}><Muted>Zuma commission</Muted><Txt variant="label">−{naira(commission)}</Txt></Row>
+              {discount > 0n ? <Row style={{ justifyContent: "space-between" }}><Muted>Promo paid by Riders App</Muted><Txt variant="label">{naira(discount)}</Txt></Row> : null}
+              <Row style={{ justifyContent: "space-between" }}><Muted>Riders App commission</Muted><Txt variant="label">−{naira(commission)}</Txt></Row>
               <Row style={{ justifyContent: "space-between" }}><Txt variant="label">You earn</Txt><Txt variant="heading">{naira(fare - commission)}</Txt></Row>
-              <Muted>{ride.paymentMethod === "CASH" ? `The passenger pays you ${naira(collect)} in cash. The commission${discount > 0n ? " and the promo top-up are" : " is"} settled in your Zuma wallet.` : `${ride.paymentMethod === "CARD" ? "Paid by card. " : ""}Earnings arrive in your wallet after the 24-hour hold.`}</Muted>
+              <Muted>{ride.paymentMethod === "CASH" ? `The passenger pays you ${naira(collect)} in cash. The commission${discount > 0n ? " and the promo top-up are" : " is"} settled in your Riders App wallet.` : `${ride.paymentMethod === "CARD" ? "Paid by card. " : ""}Earnings arrive in your wallet after the 24-hour hold.`}</Muted>
             </Card>
             <Card>
               <Txt variant="label">Rate {ride.passenger.firstName}</Txt>

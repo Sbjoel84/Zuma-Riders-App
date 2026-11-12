@@ -1,5 +1,5 @@
 /**
- * Promo codes (validation, pricing at acceptance, settlement funded by Zuma), referral rewards with
+ * Promo codes (validation, pricing at acceptance, settlement funded by Riders App), referral rewards with
  * fraud checks, and authenticator-app two-factor sign-in for admins.
  */
 import { Client } from "pg";
@@ -49,10 +49,10 @@ describe("promos, referrals and admin 2FA", () => {
 
   const window = () => ({ startsAt: new Date(Date.now() - 60_000).toISOString(), endsAt: new Date(Date.now() + 30 * 86400_000).toISOString() });
 
-  it("applies a first-ride promo funded by Zuma: passenger pays less, driver earns on the full fare", async () => {
+  it("applies a first-ride promo funded by Riders App: passenger pays less, driver earns on the full fare", async () => {
     const A = t.api(admin);
     await A.post("/v1/admin/promotions", { name: "Bad", code: "x", discountType: "PERCENTAGE", discountValue: 10, ...window() }).expect(422);
-    await A.post("/v1/admin/promotions", { name: "Welcome to Zuma", code: "WELCOME50", discountType: "PERCENTAGE", discountValue: 50, maxDiscount: "100000", firstRideOnly: true, budget: "50000000", ...window() }).expect(201);
+    await A.post("/v1/admin/promotions", { name: "Welcome to Riders App", code: "WELCOME50", discountType: "PERCENTAGE", discountValue: 50, maxDiscount: "100000", firstRideOnly: true, budget: "50000000", ...window() }).expect(201);
     await A.post("/v1/admin/promotions", { name: "Dup", code: "welcome50", discountType: "FIXED_AMOUNT", discountValue: 10000, ...window() }).expect(422);
 
     const pax = await t.passenger("08033330001", "Zainab");
@@ -68,7 +68,7 @@ describe("promos, referrals and admin 2FA", () => {
     const discount = fare / 2n > 100000n ? 100000n : fare / 2n;
     const commission = (fare * 1500n) / 10000n;
     expect(done).toMatchObject({ discountAmount: discount.toString(), passengerPays: (fare - discount).toString(), finalFare: (fare - discount).toString(), paymentMethod: "CASH" });
-    // Cash trip: driver collected fare − discount; Zuma owes them the discount and they owe the commission.
+    // Cash trip: driver collected fare − discount; Riders App owes them the discount and they owe the commission.
     expect((await t.api(drv.accessToken).get("/v1/driver/wallet")).body.availableBalance).toBe((discount - commission).toString());
     const earn = (await t.api(drv.accessToken).get("/v1/driver/earnings?period=day")).body;
     expect(earn.gross).toBe(fare.toString());
@@ -157,7 +157,7 @@ describe("promos, referrals and admin 2FA", () => {
     expect((await S.get("/v1/admin/me/security").expect(200)).body).toMatchObject({ totpEnabled: false, required: false });
 
     const setup = (await S.post("/v1/admin/me/2fa/setup").expect(200)).body;
-    expect(setup.otpauthUrl).toMatch(/^otpauth:\/\/totp\/Zuma%20Admin/);
+    expect(setup.otpauthUrl).toMatch(/^otpauth:\/\/totp\/Riders%20App%20Admin/);
     await S.post("/v1/admin/me/2fa/enable", { code: "000000" }).expect(401);
     const enabled = (await S.post("/v1/admin/me/2fa/enable", { code: totp(setup.secret) }).expect(200)).body;
     expect(enabled.recoveryCodes).toHaveLength(10);

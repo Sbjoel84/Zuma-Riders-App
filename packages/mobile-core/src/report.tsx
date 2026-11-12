@@ -42,7 +42,7 @@ export function ReportProblem({ rideId, onDone }: { rideId?: string; onDone: () 
       <Screen>
         <View style={{ flex: 1, justifyContent: "center", gap: space.lg }}>
           <Txt variant="title">We've got it</Txt>
-          <Muted variant="body">Your reference is {sent}. Zuma Support will reply in the app.{category === "SAFETY" ? " If you are in danger now, call 112." : ""}</Muted>
+          <Muted variant="body">Your reference is {sent}. Riders App Support will reply in the app.{category === "SAFETY" ? " If you are in danger now, call 112." : ""}</Muted>
           <Button title="Done" onPress={onDone} />
         </View>
       </Screen>
@@ -64,7 +64,7 @@ export function ReportProblem({ rideId, onDone }: { rideId?: string; onDone: () 
         <Field label="Title" value={subject} onChangeText={setSubject} placeholder="e.g. Charged twice for one trip" maxLength={120} />
         <Field label="What happened?" value={body} onChangeText={setBody} multiline numberOfLines={5} style={{ minHeight: 120 }} maxLength={2000} />
         {error ? <Banner text={error} /> : null}
-        <Button title="Send to Zuma Support" onPress={submit} loading={busy} />
+        <Button title="Send to Riders App Support" onPress={submit} loading={busy} />
         <Button title="Cancel" kind="ghost" onPress={onDone} />
       </ScrollView>
     </Screen>

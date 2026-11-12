@@ -72,7 +72,7 @@ export class SupportController {
     if (!t || t.requesterId !== auth.userId) fail("NOT_FOUND", "Ticket not found");
     return {
       id: t!.id, number: t!.number, subject: t!.subject, status: t!.status,
-      messages: t!.messages.map((m) => ({ id: m.id, fromSupport: m.authorId !== auth.userId, author: m.authorId === auth.userId ? "You" : "Zuma Support", body: m.body, at: m.createdAt.toISOString() })),
+      messages: t!.messages.map((m) => ({ id: m.id, fromSupport: m.authorId !== auth.userId, author: m.authorId === auth.userId ? "You" : "Riders App Support", body: m.body, at: m.createdAt.toISOString() })),
     };
   }
 

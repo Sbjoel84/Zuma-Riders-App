@@ -1,7 +1,7 @@
 import type { ExpoConfig } from "expo/config";
 
 const config: ExpoConfig = {
-  name: "Zuma",
+  name: "Riders App",
   slug: "zuma-passenger",
   scheme: "zuma",
   version: "0.1.0",
@@ -12,7 +12,7 @@ const config: ExpoConfig = {
     bundleIdentifier: "com.zuma.passenger",
     supportsTablet: false,
     infoPlist: {
-      NSLocationWhenInUseUsageDescription: "Zuma uses your location to set your pickup point and show nearby drivers.",
+      NSLocationWhenInUseUsageDescription: "Riders App uses your location to set your pickup point and show nearby drivers.",
     },
   },
   android: {
@@ -25,7 +25,7 @@ const config: ExpoConfig = {
     "expo-router",
     "expo-secure-store",
     ["expo-splash-screen", { image: "./assets/splash-icon.png", imageWidth: 160, resizeMode: "contain", backgroundColor: "#12161b" }],
-    ["expo-location", { locationWhenInUsePermission: "Zuma uses your location to set your pickup point and show nearby drivers." }],
+    ["expo-location", { locationWhenInUsePermission: "Riders App uses your location to set your pickup point and show nearby drivers." }],
     ["expo-notifications", { color: "#f2a900" }],
     "expo-web-browser",
   ],

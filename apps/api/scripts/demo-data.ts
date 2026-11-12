@@ -214,7 +214,7 @@ async function main() {
 
   // Promotions and a referral.
   const now = Date.now();
-  await admin.post("/v1/admin/promotions", { name: "Welcome to Zuma", description: "Half off the first ride for new riders", code: "WELCOME50", discountType: "PERCENTAGE", discountValue: 50, maxDiscount: "150000", firstRideOnly: true, budget: "100000000", startsAt: new Date(now - 7 * 86400_000).toISOString(), endsAt: new Date(now + 60 * 86400_000).toISOString() }).catch(() => undefined);
+  await admin.post("/v1/admin/promotions", { name: "Welcome to Riders App", description: "Half off the first ride for new riders", code: "WELCOME50", discountType: "PERCENTAGE", discountValue: 50, maxDiscount: "150000", firstRideOnly: true, budget: "100000000", startsAt: new Date(now - 7 * 86400_000).toISOString(), endsAt: new Date(now + 60 * 86400_000).toISOString() }).catch(() => undefined);
   await admin.post("/v1/admin/promotions", { name: "Abuja weekend", description: "₦500 off weekend rides", code: "ABJWEEKEND", discountType: "FIXED_AMOUNT", discountValue: 50000, minFare: "200000", perUserLimit: 4, usageLimit: 2000, startsAt: new Date(now - 86400_000).toISOString(), endsAt: new Date(now + 14 * 86400_000).toISOString() }).catch(() => undefined);
   const amakaCode = (await pax.Amaka!.get("/v1/me/referrals")).code as string;
   await pax.Ifeanyi!.post("/v1/me/referral", { code: amakaCode }).catch(() => undefined);

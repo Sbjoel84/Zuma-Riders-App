@@ -59,8 +59,8 @@ export class AdminSecurityController {
     if (a.totpEnabledAt) fail("VALIDATION_FAILED", "Two-factor is already on. Turn it off first to move to a new phone.");
     const secret = base32Encode(randomBytes(20));
     await this.prisma.db.adminProfile.update({ where: { id: a.id }, data: { totpSecretEnc: encrypt(secret) } });
-    const label = encodeURIComponent(`Zuma Admin:${a.user.phoneE164}`);
-    return { secret, otpauthUrl: `otpauth://totp/${label}?secret=${secret}&issuer=${encodeURIComponent("Zuma Admin")}&algorithm=SHA1&digits=6&period=30` };
+    const label = encodeURIComponent(`Riders App Admin:${a.user.phoneE164}`);
+    return { secret, otpauthUrl: `otpauth://totp/${label}?secret=${secret}&issuer=${encodeURIComponent("Riders App Admin")}&algorithm=SHA1&digits=6&period=30` };
   }
 
   /** Step 2: confirm with a code; returns one-time recovery codes (shown once). */

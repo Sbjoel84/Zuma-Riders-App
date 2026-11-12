@@ -50,7 +50,7 @@ export function EmergencyContactsScreen({ onBack }: { onBack: () => void }) {
     <Screen>
       <ScrollView contentContainerStyle={{ gap: space.lg, paddingBottom: space.xxl }} keyboardShouldPersistTaps="handled">
         <Header title="Emergency contacts" onBack={onBack} />
-        <Muted variant="body">When you press SOS, Zuma texts these people your location and trip details. You can also send them a live link to follow your trip.</Muted>
+        <Muted variant="body">When you press SOS, Riders App texts these people your location and trip details. You can also send them a live link to follow your trip.</Muted>
         {list.map((c) => (
           <Card key={c.id} style={{ padding: space.md }}>
             <Row style={{ justifyContent: "space-between" }}>

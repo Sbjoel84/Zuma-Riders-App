@@ -66,19 +66,19 @@ export function Login() {
   return (
     <div className="grid min-h-full lg:grid-cols-[1fr_1.1fr]">
       <div className="hidden flex-col justify-between bg-ink p-12 text-white lg:flex">
-        <span className="font-display text-3xl font-bold">zuma <span className="ml-1 rounded-md bg-amber px-2 py-0.5 align-middle text-xs tracking-wider text-ink uppercase">Ops</span></span>
+        <span className="font-display text-3xl font-bold">Riders App <span className="ml-1 rounded-md bg-amber px-2 py-0.5 align-middle text-xs tracking-wider text-ink uppercase">Ops</span></span>
         <div>
           <p className="font-display text-4xl leading-tight font-bold">Operations console</p>
-          <p className="mt-3 max-w-sm text-[#a9b0a8]">Rides, drivers, money and safety for Zuma in Abuja. Every action you take here is logged.</p>
+          <p className="mt-3 max-w-sm text-[#a9b0a8]">Rides, drivers, money and safety for Riders App in Abuja. Every action you take here is logged.</p>
         </div>
-        <span className="text-xs text-[#a9b0a8]">Authorised Zuma staff only</span>
+        <span className="text-xs text-[#a9b0a8]">Authorised Riders App staff only</span>
       </div>
       <div className="flex items-center justify-center p-6">
         {mfaToken ? (
           <form onSubmit={verifySecond} className="flex w-full max-w-sm flex-col gap-4">
             <h1 className="font-display text-3xl font-bold">{useRecovery ? "Use a recovery code" : "Authenticator code"}</h1>
             <p className="text-sm text-muted">
-              {useRecovery ? "Enter one of the recovery codes you saved when you set up two-factor sign-in. Each code works once." : "Open your authenticator app and enter the 6-digit code for Zuma Admin."}
+              {useRecovery ? "Enter one of the recovery codes you saved when you set up two-factor sign-in. Each code works once." : "Open your authenticator app and enter the 6-digit code for Riders App Admin."}
             </p>
             <Field label={useRecovery ? "Recovery code" : "6-digit code"} error={err}>
               {useRecovery ? (

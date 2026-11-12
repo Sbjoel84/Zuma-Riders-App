@@ -22,7 +22,7 @@ export function Settings() {
   const [tab, setTab] = useState("areas");
   return (
     <>
-      <PageHeader title="Settings" subtitle="Where Zuma operates, which vehicles are allowed, who has access, and what changed" />
+      <PageHeader title="Settings" subtitle="Where Riders App operates, which vehicles are allowed, who has access, and what changed" />
       <Chips label="Settings section" value={tab} onChange={setTab} options={tabs} />
       {tab === "areas" ? <Areas /> : tab === "categories" ? <Categories /> : tab === "admins" ? <Admins /> : <Audit />}
     </>

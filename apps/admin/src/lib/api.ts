@@ -95,7 +95,7 @@ export async function request<T>(method: string, path: string, body?: unknown, o
     res = await send();
     if (res.status === 401 && opts.auth !== false && (await refresh())) res = await send();
   } catch {
-    throw new ApiError(0, "NETWORK", "Can't reach the Zuma API. Check your connection.");
+    throw new ApiError(0, "NETWORK", "Can't reach the Riders App API. Check your connection.");
   }
   if (res.status === 401 && opts.auth !== false) {
     session.clear();

@@ -61,7 +61,7 @@ export class ReferralsService {
     const friend = ref.referee.firstName || "Your friend";
     if (role === "PASSENGER") {
       const amt = env().REFERRAL_REWARD_PASSENGER_KOBO;
-      await pay(ref.referrerId, "PASSENGER", amt, `Referral reward: ${friend} took their first Zuma ride`);
+      await pay(ref.referrerId, "PASSENGER", amt, `Referral reward: ${friend} took their first Riders App ride`);
       await pay(userId, "PASSENGER", amt, "Welcome reward for joining with a referral code");
     } else {
       const owner: WalletOwnerType = ref.referrer.driver ? "DRIVER" : "PASSENGER";
@@ -80,7 +80,7 @@ export class ReferralsService {
       reward: reward.toString(),
       howItWorks: scope === "DRIVER"
         ? `Invite drivers with your code. When they complete ${env().REFERRAL_DRIVER_TRIPS} trips, you get ${Money.format(env().REFERRAL_REWARD_DRIVER_KOBO)}.`
-        : `Give friends your code. When they finish their first ride, you both get ${Money.format(reward)} in your Zuma wallet.`,
+        : `Give friends your code. When they finish their first ride, you both get ${Money.format(reward)} in your Riders App wallet.`,
       earned: earned.toString(),
       referrals: rows.map((r) => ({
         name: r.referee.firstName ? `${r.referee.firstName} ${r.referee.lastName.slice(0, 1)}.`.trim() : "New user",

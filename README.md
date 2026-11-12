@@ -1,6 +1,6 @@
-# Zuma
+# Riders App
 
-Fare-negotiation ride-hailing for Nigeria, launching in Abuja. The passenger offers a price, nearby drivers accept it or counter, and the passenger picks a driver.
+Riders App: fare-negotiation ride-hailing for Nigeria, launching in Abuja (code name "zuma" in package names and app IDs). The passenger offers a price, nearby drivers accept it or counter, and the passenger picks a driver.
 
 | App | Path | Stack |
 |---|---|---|

@@ -16,7 +16,7 @@ const schema = z
 
     SMS_PROVIDER: z.enum(["console", "termii"]).default("console"),
     TERMII_API_KEY: z.string().optional(),
-    TERMII_SENDER_ID: z.string().default("Zuma"),
+    TERMII_SENDER_ID: z.string().default("RidersApp"),
 
     MAPS_PROVIDER: z.enum(["google", "estimate"]).default("estimate"),
     GOOGLE_MAPS_API_KEY: z.string().optional(),

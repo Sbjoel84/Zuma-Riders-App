@@ -153,7 +153,7 @@ function RideDetail({ id }: { id: string }) {
                 <Info k="To" v={r.dropoff.address} />
                 <Info k="Fare" v={`${naira(r.proposedFare)} proposed → ${naira(r.agreedFare)} agreed`} sub={`Suggested ${naira(r.suggestedFare)}${r.finalFare ? ` · final ${naira(r.finalFare)}` : ""}`} />
                 <Info k="Payment" v={`${titleCase(r.paymentMethod)}${r.payments.find((p) => p.card && p.status === "SUCCEEDED") ? ` · ${r.payments.find((p) => p.card && p.status === "SUCCEEDED")!.card}` : ""}`} sub={r.commission ? `Commission ${naira(r.commission)} (${r.commissionBps / 100}%)` : `Commission rate ${r.commissionBps / 100}%`} />
-                {BigInt(r.discount) > 0n ? <Info k="Promo" v={`${r.promoCode ?? "Promo"} · ${naira(r.discount)} off`} sub="Paid by Zuma. The driver earns on the full agreed fare." /> : null}
+                {BigInt(r.discount) > 0n ? <Info k="Promo" v={`${r.promoCode ?? "Promo"} · ${naira(r.discount)} off`} sub="Paid by Riders App. The driver earns on the full agreed fare." /> : null}
               </dl>
 
               {r.payments.some((p) => p.status === "FAILED") ? (

@@ -210,7 +210,7 @@ export class TripsService implements OnModuleInit {
       for (const r of settled.rewards) this.notify.send(r.userId, { category: "PAYMENT", title: `You earned ${Money.format(r.amount)}`, body: r.text, data: { type: "wallet" } });
     }
     if (event === "CANCEL") {
-      const who = actor === "PASSENGER" ? "The passenger" : actor === "DRIVER" ? `${ride.driver.user.firstName}` : "Zuma support";
+      const who = actor === "PASSENGER" ? "The passenger" : actor === "DRIVER" ? `${ride.driver.user.firstName}` : "Riders App support";
       const to = actor === "PASSENGER" ? [dUser] : actor === "DRIVER" ? [pUser] : [pUser, dUser];
       to.forEach((u) => this.notify.send(u, { category: "TRIP", title: "Trip cancelled", body: `${who} cancelled trip ${ride.code}.`, data, channelId: "rides" }));
     }

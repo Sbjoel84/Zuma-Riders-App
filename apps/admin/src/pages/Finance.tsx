@@ -130,7 +130,7 @@ function Withdrawals({ canPay }: { canPay: boolean }) {
 
   return (
     <Card title="Driver payouts" actions={<Chips label="Payout status" value={filter} onChange={setFilter} options={[{ value: "open", label: "To do" }, { value: "COMPLETED", label: "Paid" }, { value: "FAILED", label: "Failed" }, { value: "REJECTED", label: "Rejected" }, { value: "all", label: "All" }]} />}>
-      <p className="mb-3 text-xs text-muted">Drivers with a bank account verified through Paystack are paid automatically when you approve: Zuma sends the transfer and marks it paid when the bank confirms. Older accounts marked "manual" need a transfer from the company account, then "Mark as paid".</p>
+      <p className="mb-3 text-xs text-muted">Drivers with a bank account verified through Paystack are paid automatically when you approve: Riders App sends the transfer and marks it paid when the bank confirms. Older accounts marked "manual" need a transfer from the company account, then "Mark as paid".</p>
       <Async q={q}>
         {(list) =>
           list.length === 0 ? (
@@ -149,7 +149,7 @@ function Withdrawals({ canPay }: { canPay: boolean }) {
                         <Button size="sm" kind="danger" onClick={() => confirm({ title: `Reject ${naira(w.amount)} for ${w.driver}?`, body: "The money goes back to their available balance.", reason: true, danger: true, confirmLabel: "Reject payout", success: `Payout rejected. ${naira(w.amount)} returned to ${w.driver}'s balance.`, run: async (reason) => { await api.post(`/v1/admin/finance/withdrawals/${w.id}/reject`, { reason }); refresh(); } })}>Reject</Button>
                         <Button size="sm" kind="primary" onClick={() => confirm({
                           title: `Approve ${naira(w.amount)} for ${w.driver}?`,
-                          body: w.automatic ? `Zuma sends ${naira(w.amount)} to ${w.bank} through Paystack straight away.` : `Next, transfer ${naira(w.amount)} to ${w.bank}, then record it as paid.`,
+                          body: w.automatic ? `Riders App sends ${naira(w.amount)} to ${w.bank} through Paystack straight away.` : `Next, transfer ${naira(w.amount)} to ${w.bank}, then record it as paid.`,
                           confirmLabel: w.automatic ? "Approve and send" : "Approve payout",
                           run: async () => {
                             const r = await api.post<{ status: string; message?: string }>(`/v1/admin/finance/withdrawals/${w.id}/approve`);

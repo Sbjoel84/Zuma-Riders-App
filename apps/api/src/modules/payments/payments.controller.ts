@@ -75,7 +75,7 @@ export class PaymentsController {
     const t = await this.gateway.fakeCheckoutState(reference);
     res.setHeader("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; form-action *");
     if (!t) return res.status(404).send(page("Payment not found", "<p>This checkout link has expired.</p>"));
-    if (t.status !== "pending") return res.send(page("Already completed", `<p>This payment is ${t.status}.</p>${t.callbackUrl ? `<a class="b" href="${esc(back(t.callbackUrl, reference))}">Return to Zuma</a>` : ""}`));
+    if (t.status !== "pending") return res.send(page("Already completed", `<p>This payment is ${t.status}.</p>${t.callbackUrl ? `<a class="b" href="${esc(back(t.callbackUrl, reference))}">Return to Riders App</a>` : ""}`));
     return res.send(page(`Pay ${Money.format(t.amount)}`, `
       <p class="muted">Test checkout. No real card is charged. In production this page is Paystack's.</p>
       <form method="post"><input type="hidden" name="outcome" value="success"><button class="b">Pay with test card ••4081</button></form>
