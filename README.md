@@ -99,6 +99,12 @@ npx expo run:android                          # or: npx eas build --profile deve
 # same for apps/driver
 ```
 
+To look at both apps in a desktop browser (no phone needed), build the web preview. Maps, background location and push are replaced by stand-ins in `web-preview/shims`, so use it for walking through the screens, not for testing those features:
+
+```bash
+cd apps/passenger && ZUMA_WEB_PREVIEW=1 npx expo start --web     # same for apps/driver
+```
+
 To test a full trip with one computer and two phones (or one phone and an emulator):
 
 1. Driver app: sign in, complete the details and vehicle steps.

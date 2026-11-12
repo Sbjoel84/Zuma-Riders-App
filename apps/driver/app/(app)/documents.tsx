@@ -47,7 +47,9 @@ export default function Documents() {
           <Txt variant="title">Documents</Txt>
           <Button title="Close" kind="ghost" onPress={() => router.back()} />
         </Row>
-        {q.data.complete ? <Banner tone="green" text="All documents uploaded. We'll notify you when they're reviewed." /> : <Muted variant="body">Take clear photos in good light with all four corners visible. Tap a document to upload it.</Muted>}
+        {q.data.complete && [...q.data.driver, ...q.data.vehicles.flatMap((v) => v.documents)].every((d) => d.status === "APPROVED") ? (
+          <Banner tone="green" text="All your documents are approved." />
+        ) : q.data.complete ? <Banner tone="green" text="All documents uploaded. We'll notify you when they're reviewed." /> : <Muted variant="body">Take clear photos in good light with all four corners visible. Tap a document to upload it.</Muted>}
         <Card>
           <Txt variant="heading">You</Txt>
           {q.data.driver.map((d) => <Item key={d.type} d={d} />)}

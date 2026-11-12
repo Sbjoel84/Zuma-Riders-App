@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { DriverRequestView, EarningsView, RideView, WalletView } from "@zuma/contracts";
-import { ApiRequestError, api, Banner, Button, Card, clock, colors, errorMessage, km, minutes, Muted, naira, Pill, Row, Screen, secondsLeft, space, Txt, useRealtimeConnected, useServerEvent, useSession } from "@zuma/mobile-core";
+import { ApiRequestError, api, ThemeContext, Banner, Button, Card, clock, colors, errorMessage, km, minutes, Muted, naira, Pill, Row, Screen, secondsLeft, space, Txt, useRealtimeConnected, useServerEvent, useSession } from "@zuma/mobile-core";
 import * as Crypto from "expo-crypto";
 import * as Haptics from "expo-haptics";
 import { Redirect, router } from "expo-router";
@@ -188,7 +188,9 @@ function RequestCard({ r, onDone }: { r: DriverRequestView; onDone: (msg: string
     qc.setQueryData<DriverRequestView[]>(["requests"], (old) => (old ?? []).filter((x) => x.requestId !== r.requestId));
   };
 
+  // The request card is white inside the dark driver app, so its controls use the light theme.
   return (
+    <ThemeContext.Provider value={{ dark: false }}>
     <Card style={{ backgroundColor: "#fff", borderColor: "#fff" }}>
       <Row style={{ justifyContent: "space-between" }}>
         <Muted style={{ color: colors.muted }}>NEW REQUEST · {r.categoryKey.toUpperCase()}</Muted>
@@ -218,7 +220,7 @@ function RequestCard({ r, onDone }: { r: DriverRequestView; onDone: (msg: string
         </Row>
       ) : (
         <>
-          <Button title={`Accept for ${naira(r.proposedFare)}`} style={{ backgroundColor: colors.ink, borderColor: colors.ink }} loading={busy === "accept"} disabled={!!busy} onPress={() => send({ acceptPassengerPrice: true }, "accept")} />
+          <Button title={`Accept for ${naira(r.proposedFare)}`} loading={busy === "accept"} disabled={!!busy} onPress={() => send({ acceptPassengerPrice: true }, "accept")} />
           {options.length ? (
             <>
               <Muted style={{ color: colors.muted }}>Or offer your price</Muted>
@@ -240,5 +242,6 @@ function RequestCard({ r, onDone }: { r: DriverRequestView; onDone: (msg: string
         </>
       )}
     </Card>
+    </ThemeContext.Provider>
   );
 }

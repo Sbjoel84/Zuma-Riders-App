@@ -61,7 +61,7 @@ export default function Home() {
             <Txt variant="label">{(me?.firstName?.[0] ?? "Z").toUpperCase()}</Txt>
           </Pressable>
           <View style={styles.brand}><Txt variant="heading" color="#fff">zuma</Txt></View>
-          <Pressable accessibilityRole="button" onPress={() => router.push("/(app)/wallet")} style={[styles.roundBtn, { width: undefined, paddingHorizontal: 14 }]} accessibilityLabel={`Wallet balance ${naira(wallet.data?.availableBalance)}. Open wallet`}>
+          <Pressable accessibilityRole="button" onPress={() => router.push("/(app)/wallet")} style={[styles.roundBtn, { width: "auto", paddingHorizontal: 14 }]} accessibilityLabel={`Wallet balance ${naira(wallet.data?.availableBalance)}. Open wallet`}>
             <Txt variant="label">{wallet.data ? naira(wallet.data.availableBalance) : "₦—"}</Txt>
           </Pressable>
         </Row>

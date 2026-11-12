@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { RideView } from "@zuma/contracts";
-import { ApiRequestError, api, Banner, Button, Card, colors, errorMessage, Field, km, Loading, Muted, naira, Pill, radius, Row, Screen, space, Txt, useServerEvent } from "@zuma/mobile-core";
+import { ThemeContext, ApiRequestError, api, Banner, Button, Card, colors, errorMessage, Field, km, Loading, Muted, naira, Pill, radius, Row, Screen, space, Txt, useServerEvent } from "@zuma/mobile-core";
 import * as Crypto from "expo-crypto";
 import { router, useLocalSearchParams } from "expo-router";
 import { useRef, useState } from "react";
@@ -96,6 +96,8 @@ export default function DriverTrip() {
         </View>
       </SafeAreaView>
 
+      {/* The trip sheet is white inside the dark driver app, so its controls use the light theme. */}
+      <ThemeContext.Provider value={{ dark: false }}>
       <SafeAreaView edges={["bottom"]} style={styles.sheet}>
         <ScrollView contentContainerStyle={{ gap: space.lg }} keyboardShouldPersistTaps="handled">
           <Row style={{ justifyContent: "space-between" }}>
@@ -113,20 +115,20 @@ export default function DriverTrip() {
             <Muted style={{ color: colors.muted }}>{r.passenger.firstName} has a promo: collect {naira(r.passengerPays)} in cash. Zuma adds the {naira(r.discountAmount)} discount to your wallet, so you still earn on {naira(r.agreedFare)}.</Muted>
           ) : null}
           <Row gap={space.sm}>
-            <Button title={`Navigate to ${r.status === "TRIP_STARTED" ? "destination" : "pickup"}`} kind="secondary" style={{ flex: 1, borderColor: colors.line }} onPress={() => navigate(target.lat, target.lng)} />
-            <Button title={r.unreadMessages ? `Chat · ${r.unreadMessages}` : "Chat"} kind={r.unreadMessages ? "amber" : "secondary"} style={{ flex: 0.6, borderColor: colors.line }} onPress={() => router.push({ pathname: "/(app)/chat/[id]", params: { id } })} />
+            <Button title={`Navigate to ${r.status === "TRIP_STARTED" ? "destination" : "pickup"}`} kind="secondary" style={{ flex: 1 }} onPress={() => navigate(target.lat, target.lng)} />
+            <Button title={r.unreadMessages ? `Chat · ${r.unreadMessages}` : "Chat"} kind={r.unreadMessages ? "amber" : "secondary"} style={{ flex: 0.6 }} onPress={() => router.push({ pathname: "/(app)/chat/[id]", params: { id } })} />
           </Row>
 
           {error ? <Banner text={error} /> : null}
 
-          {r.status === "DRIVER_SELECTED" ? <Button title="Start driving to pickup" style={{ backgroundColor: colors.ink, borderColor: colors.ink }} loading={busy === "enroute"} onPress={enRoute} /> : null}
+          {r.status === "DRIVER_SELECTED" ? <Button title="Start driving to pickup" loading={busy === "enroute"} onPress={enRoute} /> : null}
           {r.status === "DRIVER_SELECTED" || r.status === "DRIVER_EN_ROUTE" ? <Button title="I've arrived" kind="amber" loading={busy === "arrived"} onPress={arrived} /> : null}
 
           {r.status === "DRIVER_ARRIVED" ? (
             <Card style={{ backgroundColor: colors.amberSoft, borderColor: colors.amberSoft }}>
               <Txt variant="label" color={colors.ink}>Ask {r.passenger.firstName} for their 4-digit trip PIN</Txt>
               <Field label="Trip PIN" keyboardType="number-pad" maxLength={4} value={pin} onChangeText={(v) => setPin(v.replace(/\D/g, ""))} placeholder="••••" />
-              <Button title="Start trip" style={{ backgroundColor: colors.ink, borderColor: colors.ink }} disabled={pin.length !== 4} loading={busy === "start"} onPress={start} />
+              <Button title="Start trip" disabled={pin.length !== 4} loading={busy === "start"} onPress={start} />
             </Card>
           ) : null}
 
@@ -138,7 +140,7 @@ export default function DriverTrip() {
                 <Txt variant="label" color={colors.ink}>Cancel this trip?</Txt>
                 <Muted style={{ color: colors.muted }}>Cancellations lower your acceptance score. If the passenger hasn't shown up, we'll record a no-show.</Muted>
                 <Row>
-                  <Button title="Keep trip" kind="secondary" style={{ flex: 1, borderColor: colors.line }} onPress={() => setConfirmCancel(false)} />
+                  <Button title="Keep trip" kind="secondary" style={{ flex: 1 }} onPress={() => setConfirmCancel(false)} />
                   <Button title="Cancel" style={{ flex: 1, backgroundColor: colors.red, borderColor: colors.red }} loading={busy === "cancel"} onPress={cancel} />
                 </Row>
               </Card>
@@ -149,6 +151,7 @@ export default function DriverTrip() {
           <Muted center style={{ color: colors.muted }}>{km(r.distanceM)} trip · fare locked at {naira(r.agreedFare)}</Muted>
         </ScrollView>
       </SafeAreaView>
+      </ThemeContext.Provider>
     </View>
   );
 }
@@ -187,7 +190,7 @@ function TripSummary({ ride, onDone }: { ride: RideView; onDone: () => void }) {
               <Row gap={space.sm}>
                 {[1, 2, 3, 4, 5].map((n) => (
                   <Pressable key={n} accessibilityRole="button" accessibilityLabel={`${n} star${n > 1 ? "s" : ""}`} disabled={sent} onPress={() => rate(n)} style={{ padding: 4 }}>
-                    <Txt variant="display" color={n <= stars ? colors.amber : colors.nightLine}>★</Txt>
+                    <Txt variant="display" color={n <= stars ? colors.amber : colors.nightMuted}>★</Txt>
                   </Pressable>
                 ))}
               </Row>
